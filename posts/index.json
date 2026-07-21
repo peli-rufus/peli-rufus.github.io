@@ -7,52 +7,10 @@
     "readTime": 16,
     "views": 0,
     "private": false,
-    "excerpt": "A practical DFIR guide to IconCache.db featuring IconCacheReader \u2014 real evidence of VMware shared-folder activity, USB drive browsing, and how to avoid overclaiming execution from path text alone.",
+    "excerpt": "A practical DFIR guide to IconCache.db featuring IconCacheReader — real evidence of VMware shared-folder activity, USB drive browsing, and how to avoid overclaiming execution from path text alone.",
     "related": [
       "blackbasta-memory-forensics",
       "evtx-tampering-recovery"
-    ]
-  },
-  {
-    "id": "blackbasta-memory-forensics",
-    "title": "Hunting BlackBasta: Memory Artifacts and Pre-Encryption Indicators",
-    "date": "2025-03-15",
-    "tag": "Ransomware",
-    "readTime": 12,
-    "views": 847,
-    "private": false,
-    "excerpt": "A deep dive into BlackBasta ransomware memory artifacts \u2014 pre-encryption indicators, Volatility3 analysis, and YARA rule development.",
-    "related": [
-      "vql-triage-recipes",
-      "evtx-tampering-recovery"
-    ]
-  },
-  {
-    "id": "vql-triage-recipes",
-    "title": "Velociraptor VQL Recipes for Rapid Triage",
-    "date": "2025-02-28",
-    "tag": "Threat Hunting",
-    "readTime": 8,
-    "views": 612,
-    "private": false,
-    "excerpt": "Battle-tested VQL queries for rapid endpoint triage during live IR engagements. Process trees, LOLBins, persistence, and more.",
-    "related": [
-      "blackbasta-memory-forensics",
-      "evtx-tampering-recovery"
-    ]
-  },
-  {
-    "id": "evtx-tampering-recovery",
-    "title": "Windows Event Log Tampering: Detection & Recovery",
-    "date": "2025-02-10",
-    "tag": "Forensics",
-    "readTime": 10,
-    "views": 489,
-    "private": false,
-    "excerpt": "How attackers clear and tamper with Windows event logs, and the forensic artifacts that remain \u2014 from prefetch to shadow copies.",
-    "related": [
-      "vql-triage-recipes",
-      "cobalt-strike-network-forensics"
     ]
   }
 ]
