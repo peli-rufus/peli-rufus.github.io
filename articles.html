@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Articles — DFIR Engineer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+.search-wrap{position:relative;margin-bottom:1.5rem}
+.search-input{width:100%;padding:.9rem 1rem .9rem 3rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-bright);font-family:var(--font-mono);font-size:.85rem;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--accent)}.search-input::placeholder{color:var(--text-dim)}
+.search-icon{position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;font-size:1rem}
+.search-count{font-family:var(--font-mono);font-size:.75rem;color:var(--text-dim);margin-bottom:1.5rem}
+.tag-pill{font-family:var(--font-mono);font-size:.72rem;padding:.3rem .85rem;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text-dim);background:var(--surface);transition:all .2s}
+.tag-pill:hover,.tag-pill.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.06)}
+.blog-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.75rem;cursor:pointer;transition:border-color .2s,transform .15s;display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:start}
+.blog-card:hover{border-color:rgba(0,212,255,.3);transform:translateX(4px)}
+.blog-card-meta{display:flex;gap:.75rem;align-items:center;margin-bottom:.65rem;flex-wrap:wrap}
+.blog-card h3{font-size:1.1rem;color:var(--text-bright);margin-bottom:.6rem;line-height:1.4}
+.blog-card p{font-size:.875rem;color:var(--text-dim);line-height:1.7;margin-bottom:.75rem}
+.blog-card-stats{display:flex;gap:1rem;font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)}
+.rt-badge{font-family:var(--font-mono);font-size:.7rem;padding:.2rem .6rem;border-radius:3px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.15);color:var(--accent)}
+.private-badge{font-family:var(--font-mono);font-size:.65rem;padding:.15rem .5rem;border-radius:3px;background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.25);color:var(--accent3)}
+.post-view{display:none}.post-view.active{display:block}
+.post-hero{padding:calc(var(--nav-h) + 3rem) 2rem 3rem;background:var(--bg2);border-bottom:1px solid var(--border)}
+.post-hero-inner{max-width:760px;margin:0 auto}
+.back-btn{font-family:var(--font-mono);font-size:.8rem;color:var(--accent);background:none;border:1px solid var(--border);padding:.5rem 1rem;border-radius:4px;cursor:pointer;margin-bottom:1.5rem;transition:all .2s;display:inline-flex;align-items:center;gap:.4rem}
+.back-btn:hover{border-color:var(--accent);background:rgba(0,212,255,.05)}
+.post-title{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;color:var(--text-bright);letter-spacing:-.02em;line-height:1.2;margin:1rem 0 .75rem}
+.post-excerpt-disp{color:var(--text-dim);font-size:1.05rem;line-height:1.7;max-width:600px}
+.post-meta-bar{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)}
+.post-meta-item{font-family:var(--font-mono);font-size:.78rem;color:var(--text-dim);display:flex;align-items:center;gap:.4rem}
+.post-meta-item b{color:var(--text-bright)}
+.post-body{max-width:760px;margin:0 auto;padding:4rem 2rem}
+.post-body h1,.post-body h2{color:var(--text-bright);margin:2.5rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.post-body h1{font-size:1.6rem}.post-body h2{font-size:1.4rem}
+.post-body h3{color:var(--accent);font-size:1rem;margin:1.75rem 0 .75rem;font-family:var(--font-mono)}
+.post-body p{color:var(--text);margin-bottom:1.5rem;line-height:1.9}
+.post-body ul,.post-body ol{color:var(--text);padding-left:1.5rem;margin-bottom:1.5rem}
+.post-body li{margin-bottom:.4rem;line-height:1.7}
+.post-body strong{color:var(--text-bright)}
+.post-body pre{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:6px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}
+.post-body code{font-family:var(--font-mono);font-size:.83rem;color:var(--accent2)}
+.post-body pre code{color:#c9d1d9;font-size:.82rem}
+.post-body blockquote{border-left:3px solid var(--accent);padding:.75rem 1.5rem;margin:2rem 0;color:var(--text-dim);font-style:italic;background:rgba(0,212,255,.03);border-radius:0 6px 6px 0}
+.post-body a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.post-body img{max-width:100%;border-radius:6px;border:1px solid var(--border);margin:1rem 0}
+.related-section{max-width:760px;margin:0 auto;padding:0 2rem 4rem}
+.related-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem}
+.related-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1.25rem;cursor:pointer;transition:border-color .2s}
+.related-card:hover{border-color:rgba(0,212,255,.3)}
+.related-card h4{font-size:.9rem;color:var(--text-bright);line-height:1.4;margin-top:.4rem}
+.empty-state{text-align:center;padding:4rem 2rem;color:var(--text-dim);font-family:var(--font-mono);font-size:.85rem}
+.loading{text-align:center;padding:3rem;color:var(--text-dim);font-family:var(--font-mono);font-size:.8rem}
+@media(max-width:700px){.blog-card,.related-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div><div class="noise"></div>
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html" class="nav-link">~/home</a></li>
+        <li><a href="articles.html" class="nav-link active">~/articles</a></li>
+        <li><a href="tools.html" class="nav-link">~/tools</a></li>
+        <li><a href="index.html#contact" class="nav-link">~/contact</a></li>
+      </ul>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <!-- BLOG LIST -->
+  <div id="view-list">
+    <div class="page-hero"><div class="page-hero-inner">
+      <span class="page-tag">// field notes</span>
+      <h1 class="page-title">Articles</h1>
+      <p class="page-desc">Write-ups, case studies, and detection engineering insights from real-world engagements.</p>
+    </div></div>
+    <section class="section"><div class="container">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="search" type="text" placeholder="Search posts by title, tag, or keyword..." autocomplete="off"/>
+      </div>
+      <div class="filter-bar" id="tag-bar"></div>
+      <p class="search-count" id="result-count"></p>
+      <div class="blog-list" id="post-list"><div class="loading">// loading posts...</div></div>
+    </div></section>
+  </div>
+
+  <!-- POST VIEW -->
+  <div id="view-post" class="post-view">
+    <div class="post-hero"><div class="post-hero-inner">
+      <button class="back-btn" id="back-btn">← Back to Articles</button>
+      <div id="post-tag-bar" style="margin-bottom:.75rem"></div>
+      <h1 class="post-title" id="post-title"></h1>
+      <p class="post-excerpt-disp" id="post-excerpt"></p>
+      <div class="post-meta-bar">
+        <div class="post-meta-item">📅 <b id="post-date"></b></div>
+        <div class="post-meta-item">⏱ <b id="post-rt"></b> min read</div>
+        <div class="post-meta-item">👁 <b id="post-views"></b> views</div>
+      </div>
+    </div></div>
+    <div class="post-body" id="post-body"><div class="loading">// loading post...</div></div>
+    <div class="related-section" id="related-section"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="container"><div class="footer-inner">
+      <span class="footer-logo">[pelirufus.sh]</span>
+      <span class="footer-copy">Built with coffee and curiosity · Hosted on GitHub Pages</span>
+      <span class="footer-tag">// stay curious. stay dangerous.</span>
+    </div></div>
+  </footer>
+
+  <script>
+  /* ═══════════════════════════════════════════════
+     DFIR BLOG — Markdown File Engine
+     Fetches posts/index.json for listing
+     Fetches posts/{id}.md for content
+     Parses YAML frontmatter from .md files
+  ═══════════════════════════════════════════════ */
+
+  const VIEWS_KEY = 'dfir_views';
+  let index = [];       // metadata from index.json
+  let filtered = [];
+  let activeTag = 'all';
+  let sq = '';
+
+  /* ── VIEWS ────────────────────────────────── */
+  function getViews() { try { return JSON.parse(localStorage.getItem(VIEWS_KEY)) || {}; } catch { return {}; } }
+  function incView(id) { const v = getViews(); v[id] = (v[id] || 0) + 1; localStorage.setItem(VIEWS_KEY, JSON.stringify(v)); return v[id]; }
+  function viewCount(p) { const s = getViews()[p.id]; return s !== undefined ? s : (p.views || 0); }
+
+  /* ── FRONTMATTER PARSER ───────────────────── */
+  function parseFrontmatter(raw) {
+    const match = raw.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!match) return { meta: {}, content: raw };
+    const meta = {};
+    match[1].split('\n').forEach(line => {
+      const [key, ...rest] = line.split(':');
+      if (!key || !rest.length) return;
+      let val = rest.join(':').trim().replace(/^"|"$/g, '');
+      if (val === 'true') val = true;
+      else if (val === 'false') val = false;
+      else if (!isNaN(val) && val !== '') val = Number(val);
+      meta[key.trim()] = val;
+    });
+    // parse related array
+    const relMatch = match[1].match(/related:\s*\n((?:\s+- .+\n?)+)/);
+    if (relMatch) {
+      meta.related = relMatch[1].match(/- (.+)/g).map(s => s.replace('- ', '').trim());
+    }
+    return { meta, content: match[2] };
+  }
+
+  /* ── INIT ─────────────────────────────────── */
+  async function init() {
+    // Detect file:// protocol — fetch() is blocked there by browser security
+    if (location.protocol === 'file:') {
+      document.getElementById('post-list').innerHTML = `<div class="empty-state" style="text-align:left;max-width:560px;margin:0 auto;line-height:1.9">
+        ⚠ <strong style="color:var(--warn)">This page was opened directly as a file.</strong><br><br>
+        Browsers block data loading (fetch) on <code style="color:var(--accent)">file://</code> pages for security — that's why no articles are showing.<br><br>
+        <strong style="color:var(--text-bright)">Fix:</strong> run a local server, then open this page through it:<br>
+        <code style="color:var(--accent2);display:block;margin:.5rem 0">cd dfir-portfolio &amp;&amp; python3 -m http.server 8080</code>
+        Then visit <a href="http://localhost:8080/articles.html" style="color:var(--accent)">http://localhost:8080/articles.html</a> — or use the <strong style="color:var(--text-bright)">🌐 Preview Articles</strong> button in admin.html, which does this for you.
+      </div>`;
+      return;
+    }
+    try {
+      const res = await fetch('posts/index.json');
+      index = await res.json();
+    } catch {
+      index = [];
+      document.getElementById('post-list').innerHTML = '<div class="empty-state">// could not load posts. Make sure posts/index.json exists and you\'re running a local server.</div>';
+      return;
+    }
+    renderTagBar();
+    applyFilter();
+    checkHash();
+  }
+
+  /* ── TAG BAR ──────────────────────────────── */
+  function renderTagBar() {
+    const visible = index.filter(p => !p.private);
+    const tags = ['all', ...new Set(visible.map(p => p.tag))];
+    document.getElementById('tag-bar').innerHTML = tags.map(t =>
+      `<button class="tag-pill${t === activeTag ? ' active' : ''}" onclick="setTag('${t}')">${t === 'all' ? 'All Posts' : t}</button>`
+    ).join('');
+  }
+
+  function setTag(t) {
+    activeTag = t;
+    document.querySelectorAll('.tag-pill').forEach(b =>
+      b.classList.toggle('active', b.textContent.trim() === (t === 'all' ? 'All Posts' : t))
+    );
+    applyFilter();
+  }
+
+  /* ── FILTER ───────────────────────────────── */
+  document.getElementById('search').addEventListener('input', e => { sq = e.target.value.toLowerCase(); applyFilter(); });
+
+  function applyFilter() {
+    const visible = index.filter(p => !p.private);
+    filtered = visible.filter(p => {
+      const mt = activeTag === 'all' || p.tag === activeTag;
+      const ms = !sq ||
+        p.title.toLowerCase().includes(sq) ||
+        (p.tag || '').toLowerCase().includes(sq) ||
+        (p.excerpt || '').toLowerCase().includes(sq);
+      return mt && ms;
+    });
+    renderList();
+  }
+
+  /* ── RENDER LIST ──────────────────────────── */
+  function renderList() {
+    const list = document.getElementById('post-list');
+    const rc   = document.getElementById('result-count');
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty-state">// no posts match your search</div>';
+      rc.textContent = '0 posts found'; return;
+    }
+    rc.textContent = `${filtered.length} post${filtered.length !== 1 ? 's' : ''}${sq ? ' matching "' + sq + '"' : ''}`;
+    list.innerHTML = filtered.map(p => {
+      const v = viewCount(p);
+      const d = new Date(p.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `<div class="blog-card reveal" onclick="openPost('${p.id}')">
+        <div>
+          <div class="blog-card-meta"><span class="post-tag">${p.tag}</span><span class="post-date">${d}</span></div>
+          <h3>${p.title}</h3>
+          <p>${p.excerpt || ''}</p>
+          <div class="blog-card-stats"><span>⏱ ${p.readTime} min read</span><span>👁 ${v.toLocaleString()} views</span></div>
+        </div>
+        <div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:.5rem">
+          <span class="rt-badge">${p.readTime}m</span>
+          <span style="font-family:var(--font-mono);font-size:.75rem;color:var(--accent)">Read →</span>
+        </div>
+      </div>`;
+    }).join('');
+    setTimeout(() => document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible')), 50);
+  }
+
+  /* ── OPEN POST ────────────────────────────── */
+  async function openPost(id) {
+    const meta = index.find(p => p.id === id);
+    if (!meta || meta.private) return;
+
+    document.getElementById('view-list').style.display = 'none';
+    const vp = document.getElementById('view-post');
+    vp.classList.add('active');
+    document.getElementById('post-body').innerHTML = '<div class="loading">// loading post...</div>';
+
+    const v = incView(id);
+
+    // Fill header from index metadata immediately
+    document.getElementById('post-title').textContent   = meta.title;
+    document.getElementById('post-excerpt').textContent = meta.excerpt || '';
+    document.getElementById('post-date').textContent    = new Date(meta.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('post-rt').textContent      = meta.readTime;
+    document.getElementById('post-views').textContent   = v.toLocaleString();
+    document.getElementById('post-tag-bar').innerHTML   = `<span class="post-tag">${meta.tag}</span>`;
+
+    // Fetch the .md file
+    try {
+      const res  = await fetch(`posts/${id}.md`);
+      const raw  = await res.text();
+      const { content } = parseFrontmatter(raw);
+      document.getElementById('post-body').innerHTML = window.marked ? marked.parse(content) : `<pre>${content}</pre>`;
+    } catch {
+      document.getElementById('post-body').innerHTML = '<p style="color:var(--danger)">// could not load post content.</p>';
+    }
+
+    // Related posts
+    const rel = (meta.related || []).map(rid => index.find(p => p.id === rid)).filter(Boolean).slice(0, 4);
+    const rs = document.getElementById('related-section');
+    rs.innerHTML = rel.length
+      ? `<h3 style="font-family:var(--font-mono);font-size:.8rem;color:var(--text-dim);letter-spacing:.1em;text-transform:uppercase;padding-top:2rem;border-top:1px solid var(--border);margin-bottom:0">// related posts</h3>
+         <div class="related-grid">${rel.map(r => `<div class="related-card" onclick="openPost('${r.id}')"><span class="post-tag">${r.tag}</span><h4>${r.title}</h4></div>`).join('')}</div>`
+      : '';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.location.hash = id;
+  }
+
+  document.getElementById('back-btn').addEventListener('click', () => {
+    document.getElementById('view-post').classList.remove('active');
+    document.getElementById('view-list').style.display = '';
+    window.location.hash = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  function checkHash() {
+    const id = window.location.hash.replace('#', '');
+    if (id && index.find(p => p.id === id && !p.private)) openPost(id);
+  }
+
+  window.addEventListener('scroll', () =>
+    document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 20)
+  , { passive: true });
+
+  const hb = document.getElementById('hamburger');
+  const nl = document.getElementById('nav-links');
+  if (hb) hb.addEventListener('click', () => nl.classList.toggle('open'));
+
+  init();
+  </script>
+</body>
+</html>

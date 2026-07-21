@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tools — DFIR Engineer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    /* Overrides and additions for tools page */
+    .tool-full-card { opacity:1 !important; transform:none !important; }
+
+    .tools-page-header {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;
+    }
+    .gh-link {
+      font-family: var(--font-mono); font-size: .78rem; color: var(--accent);
+      display: inline-flex; align-items: center; gap: .4rem;
+      border: 1px solid var(--border); padding: .4rem .9rem;
+      border-radius: 4px; text-decoration: none; transition: all .2s;
+    }
+    .gh-link:hover { border-color: var(--accent); background: rgba(0,212,255,.05); }
+
+    /* Filter bar */
+    .tools-filter { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:2rem; }
+    .tfbtn {
+      font-family:var(--font-mono); font-size:.72rem; padding:.3rem .85rem;
+      border-radius:20px; cursor:pointer; border:1px solid var(--border);
+      color:var(--text-dim); background:var(--surface); transition:all .2s;
+    }
+    .tfbtn:hover,.tfbtn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,212,255,.06); }
+
+    /* Stats bar */
+    .tools-stats {
+      display:flex; gap:2rem; margin-bottom:2rem; padding:1rem 1.5rem;
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      flex-wrap:wrap;
+    }
+    .ts-stat { display:flex; flex-direction:column; }
+    .ts-num { font-family:var(--font-mono); font-size:1.4rem; font-weight:700; color:var(--accent); }
+    .ts-lbl { font-family:var(--font-mono); font-size:.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.08em; }
+    .ts-div { width:1px; background:var(--border); align-self:stretch; }
+
+    /* Tool grid */
+    .tools-full-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+
+    .tool-full-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:8px;
+      padding:2rem; display:flex; flex-direction:column; gap:0;
+      transition:border-color .2s, transform .2s; opacity:1; transform:none;
+    }
+    .tool-full-card:hover { border-color:rgba(0,212,255,.35); transform:translateY(-2px); }
+
+    .tool-full-header { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; }
+    .tool-full-icon { font-size:2.2rem; flex-shrink:0; }
+    .tool-full-header-text { flex:1; }
+    .tool-full-header-text h3 { font-size:1.15rem; color:var(--text-bright); margin-bottom:.2rem; }
+    .tool-version { font-family:var(--font-mono); font-size:.72rem; color:var(--text-dim); }
+
+    .tool-status {
+      font-family:var(--font-mono); font-size:.68rem; padding:.22rem .65rem;
+      border-radius:20px; flex-shrink:0;
+      background:rgba(0,255,136,.08); border:1px solid rgba(0,255,136,.25); color:var(--accent2);
+    }
+    .tool-status.wip { background:rgba(255,165,0,.08); border-color:rgba(255,165,0,.3); color:var(--warn); }
+
+    .tool-full-desc { color:var(--text-dim); font-size:.9rem; line-height:1.8; margin-bottom:1.25rem; }
+
+    .tool-features { list-style:none; margin-bottom:1.25rem; }
+    .tool-features li {
+      font-family:var(--font-mono); font-size:.78rem; color:var(--text);
+      padding:.3rem 0; border-bottom:1px solid rgba(30,45,61,.5);
+    }
+    .tool-features li:last-child { border-bottom:none; }
+    .tool-features li::before { content:'✓ '; color:var(--accent2); }
+
+    .tool-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1.25rem; }
+    .tool-tags span {
+      font-family:var(--font-mono); font-size:.68rem; padding:.15rem .55rem;
+      background:rgba(0,212,255,.05); border:1px solid var(--border);
+      border-radius:3px; color:var(--text-dim);
+    }
+
+    .tool-gh-meta {
+      font-family:var(--font-mono); font-size:.68rem; color:var(--text-dim);
+      display:flex; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap;
+    }
+
+    .tool-full-links { display:flex; gap:.75rem; margin-top:auto; }
+    .tool-btn {
+      font-family:var(--font-mono); font-size:.78rem; padding:.5rem 1rem;
+      border-radius:4px; background:var(--accent); color:#000;
+      border:1px solid var(--accent); transition:all .2s;
+      text-decoration:none; display:inline-flex; align-items:center; gap:.4rem;
+    }
+    .tool-btn:hover { background:transparent; color:var(--accent); }
+    .tool-btn.ghost { background:transparent; color:var(--text-dim); border-color:var(--border); }
+    .tool-btn.ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* Skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
+      background-size:200% 100%; animation:shimmer 1.5s infinite;
+      border-radius:8px; height:280px;
+    }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* Error / empty */
+    .tools-notice {
+      grid-column:span 2; text-align:center; padding:3rem;
+      font-family:var(--font-mono); font-size:.85rem; color:var(--text-dim);
+    }
+
+    @media(max-width:900px) {
+      .tools-full-grid { grid-template-columns:1fr; }
+      .tools-notice { grid-column:span 1; }
+    }
+    @media(max-width:600px) { .tools-stats { gap:1rem; } }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div><div class="noise"></div>
+
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="index.html" class="nav-link">~/home</a></li>
+        <li><a href="articles.html" class="nav-link">~/articles</a></li>
+        <li><a href="tools.html" class="nav-link active">~/tools</a></li>
+        <li><a href="index.html#contact" class="nav-link">~/contact</a></li>
+      </ul>
+      <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+
+  <div class="page-hero">
+    <div class="page-hero-inner">
+      <span class="page-tag">// open source arsenal</span>
+      <h1 class="page-title">Tools</h1>
+      <p class="page-desc">Custom-built tools for digital forensics, incident response, and detection engineering — pulled live from GitHub. All open source.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+
+      <!-- STATS BAR (populated dynamically) -->
+      <div class="tools-stats" id="tools-stats">
+        <div class="ts-stat"><span class="ts-num" id="stat-total">—</span><span class="ts-lbl">Repositories</span></div>
+        <div class="ts-div"></div>
+        <div class="ts-stat"><span class="ts-num" id="stat-stars">—</span><span class="ts-lbl">Total Stars</span></div>
+        <div class="ts-div"></div>
+        <div class="ts-stat"><span class="ts-num" id="stat-forks">—</span><span class="ts-lbl">Total Forks</span></div>
+        <div class="ts-div"></div>
+        <div class="ts-stat"><span class="ts-num" id="stat-langs">—</span><span class="ts-lbl">Languages</span></div>
+      </div>
+
+      <!-- HEADER + FILTER -->
+      <div class="tools-page-header">
+        <div class="tools-filter" id="filter-bar">
+          <button class="tfbtn active" data-filter="all">All</button>
+        </div>
+        <a href="https://github.com/peli-rufus" target="_blank" class="gh-link" id="gh-profile-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          View GitHub Profile
+        </a>
+      </div>
+
+      <!-- TOOL CARDS GRID -->
+      <div class="tools-full-grid" id="tools-grid">
+        <!-- Skeletons while loading -->
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><div class="footer-inner">
+      <span class="footer-logo">[pelirufus.sh]</span>
+      <span class="footer-copy">Built with coffee and curiosity &middot; Hosted on GitHub Pages</span>
+      <span class="footer-tag">// stay curious. stay dangerous.</span>
+    </div></div>
+  </footer>
+
+  <script>
+  /* ═══════════════════════════════════════════════
+     TOOLS PAGE — GitHub API driven
+     Fetches all public repos → renders as tool cards
+     Filter buttons built dynamically from languages
+  ═══════════════════════════════════════════════ */
+
+  /* ── CONFIG ───────────────────────────────────
+     GITHUB_USERNAME : your GitHub username
+     DFIR_TOPIC      : topic tag on repos you want shown
+                       Set to '' to show ALL public repos
+     REPO_DETAILS    : optional override map — add extra
+                       detail (features, status) per repo name
+  ─────────────────────────────────────────────── */
+  const GITHUB_USERNAME = 'peli-rufus';
+  const DFIR_TOPIC      = '';               // '' = show all tool repos. Tag repos 'dfir' on GitHub then set this to 'dfir'.
+  const EXCLUDE_REPOS   = ['peli-rufus.github.io']; // never show these (the site repo itself, forks, etc.)
+
+  // Optional: enrich specific repos with extra detail that GitHub API doesn't have.
+  // Key = exact repo name. Leave empty {} to use only GitHub data.
+  const REPO_DETAILS = {
+    'IconCacheReader': {
+      icon: '🔬',
+      status: 'active',
+      features: [
+        'Extracts historical binary paths from Windows IconCache.db',
+        'Optional Amcache.hve SHA1 enrichment',
+        'Runs directly from a mounted image or live system',
+        'Built for incident response triage workflows',
+        'Outputs structured, analyst-ready results'
+      ]
+    }
+    // Add more tools here as you publish them, e.g.:
+    // 'YourNextTool': { icon: '🧬', status: 'wip', features: ['...'] }
+  };
+
+  const LANG_ICONS = {
+    Python:'🐍', PowerShell:'⚡', Go:'🔵', JavaScript:'🟨',
+    Shell:'🔧', 'C#':'💜', C:'⚙', 'C++':'⚙', Rust:'🦀', default:'💻'
+  };
+
+  let allRepos = [];
+  let activeFilter = 'all';
+
+  async function loadTools() {
+    const grid = document.getElementById('tools-grid');
+    try {
+      const url  = `https://api.github.com/users/${GITHUB_USERNAME}/repos?sort=pushed&per_page=100&type=public`;
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error('GitHub API returned ' + res.status);
+      let repos  = await res.json();
+
+      // Always exclude the site repo, forks, and archived repos
+      repos = repos.filter(r =>
+        !EXCLUDE_REPOS.includes(r.name) &&
+        !r.fork &&
+        !r.archived
+      );
+
+      // Filter by topic if set
+      if (DFIR_TOPIC) {
+        const filtered = repos.filter(r => r.topics && r.topics.includes(DFIR_TOPIC));
+        allRepos = filtered.length ? filtered : repos; // fallback to all if none tagged
+      } else {
+        allRepos = repos;
+      }
+
+      // Sort: repos with REPO_DETAILS enrichment first, then by stars
+      allRepos.sort((a, b) => {
+        const aDetail = REPO_DETAILS[a.name] ? 1 : 0;
+        const bDetail = REPO_DETAILS[b.name] ? 1 : 0;
+        if (aDetail !== bDetail) return bDetail - aDetail;
+        return b.stargazers_count - a.stargazers_count;
+      });
+
+      // Update stats
+      const totalStars = allRepos.reduce((s, r) => s + r.stargazers_count, 0);
+      const totalForks = allRepos.reduce((s, r) => s + r.forks_count, 0);
+      const langs = [...new Set(allRepos.map(r => r.language).filter(Boolean))];
+      document.getElementById('stat-total').textContent = allRepos.length;
+      document.getElementById('stat-stars').textContent = totalStars;
+      document.getElementById('stat-forks').textContent = totalForks;
+      document.getElementById('stat-langs').textContent = langs.length;
+
+      // Build filter buttons from languages
+      buildFilters(langs);
+
+      // Render cards
+      renderCards(allRepos);
+
+      // Update GitHub profile link
+      document.getElementById('gh-profile-link').href = `https://github.com/${GITHUB_USERNAME}`;
+
+    } catch(e) {
+      grid.innerHTML = `<div class="tools-notice">
+        <p>&#128295; Could not load repositories from GitHub API.</p>
+        <p style="margin-top:.75rem;font-size:.75rem">${e.message}</p>
+        <p style="margin-top:.5rem"><a href="https://github.com/${GITHUB_USERNAME}" target="_blank" style="color:var(--accent)">View GitHub Profile &rarr;</a></p>
+      </div>`;
+      document.getElementById('stat-total').textContent = '?';
+      document.getElementById('stat-stars').textContent = '?';
+      document.getElementById('stat-forks').textContent = '?';
+      document.getElementById('stat-langs').textContent = '?';
+    }
+  }
+
+  function buildFilters(langs) {
+    const bar = document.getElementById('filter-bar');
+    bar.innerHTML = `<button class="tfbtn active" data-filter="all" onclick="applyFilter('all', this)">All</button>`;
+    langs.forEach(lang => {
+      bar.innerHTML += `<button class="tfbtn" data-filter="${lang}" onclick="applyFilter('${lang}', this)">${lang}</button>`;
+    });
+    // Add status filters if we have enriched repos
+    const hasWip    = allRepos.some(r => REPO_DETAILS[r.name]?.status === 'wip');
+    const hasActive = allRepos.some(r => REPO_DETAILS[r.name]?.status === 'active');
+    if (hasActive) bar.innerHTML += `<button class="tfbtn" data-filter="active" onclick="applyFilter('active', this)">Active</button>`;
+    if (hasWip)    bar.innerHTML += `<button class="tfbtn" data-filter="wip" onclick="applyFilter('wip', this)">WIP</button>`;
+  }
+
+  function applyFilter(filter, btn) {
+    activeFilter = filter;
+    document.querySelectorAll('.tfbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const filtered = allRepos.filter(r => {
+      if (filter === 'all')    return true;
+      if (filter === 'active') return REPO_DETAILS[r.name]?.status === 'active';
+      if (filter === 'wip')    return REPO_DETAILS[r.name]?.status === 'wip';
+      return r.language === filter;
+    });
+    renderCards(filtered);
+  }
+
+  function renderCards(repos) {
+    const grid = document.getElementById('tools-grid');
+    if (!repos.length) {
+      grid.innerHTML = `<div class="tools-notice">// no tools match this filter</div>`;
+      return;
+    }
+    grid.innerHTML = repos.map(repo => {
+      const detail  = REPO_DETAILS[repo.name] || {};
+      const icon    = detail.icon || LANG_ICONS[repo.language] || LANG_ICONS.default;
+      const status  = detail.status || 'active';
+      const statusLabel = status === 'wip' ? 'WIP' : 'Active';
+      const lang    = repo.language || 'Shell';
+      const desc    = repo.description || 'No description provided.';
+      const stars   = repo.stargazers_count || 0;
+      const forks   = repo.forks_count || 0;
+      const pushed  = new Date(repo.pushed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      const topics  = (repo.topics || []).filter(t => t !== DFIR_TOPIC).slice(0, 4);
+
+      const featuresHtml = detail.features
+        ? `<ul class="tool-features">${detail.features.map(f => `<li>${f}</li>`).join('')}</ul>`
+        : '';
+
+      return `<div class="tool-full-card">
+        <div class="tool-full-header">
+          <div class="tool-full-icon">${icon}</div>
+          <div class="tool-full-header-text">
+            <h3>${repo.name}</h3>
+            <span class="tool-version">${lang}</span>
+          </div>
+          <span class="tool-status ${status === 'wip' ? 'wip' : ''}">${statusLabel}</span>
+        </div>
+        <p class="tool-full-desc">${desc}</p>
+        ${featuresHtml}
+        <div class="tool-tags">
+          <span>${lang}</span>
+          ${topics.map(t => `<span>${t}</span>`).join('')}
+        </div>
+        <div class="tool-gh-meta">
+          <span>&#11088; ${stars} stars</span>
+          <span>&#128295; ${forks} forks</span>
+          <span>Updated ${pushed}</span>
+        </div>
+        <div class="tool-full-links">
+          <a href="${repo.html_url}" target="_blank" class="tool-btn">GitHub &#8599;</a>
+          ${repo.homepage ? `<a href="${repo.homepage}" target="_blank" class="tool-btn ghost">Docs &#8599;</a>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // NAV + hamburger
+  const nav = document.getElementById('nav');
+  window.addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 20), { passive: true });
+  document.getElementById('hamburger').addEventListener('click', () =>
+    document.getElementById('nav-links').classList.toggle('open')
+  );
+
+  loadTools();
+  </script>
+</body>
+</html>

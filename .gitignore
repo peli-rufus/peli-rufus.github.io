@@ -1,0 +1,20 @@
+# Admin panel — local only, never push to GitHub
+admin.html
+
+# Diagnostic page — local dev only (optional to push)
+diag.html
+
+# Internal build notes — not part of the public site
+README.md
+
+# Old monolithic posts.json (replaced by posts/index.json)
+posts.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+*.swp
+*~
