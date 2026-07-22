@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script>(function(){try{if(localStorage.getItem('theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
+  <title>Matrix — Peligey Rufus</title>
+  <meta name="description" content="Reference matrices for Windows, Linux, Active Directory, memory, malware, and vSphere forensics — built and maintained for real casework.">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/img/favicon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .matrix-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+    .matrix-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1.75rem; display: flex; flex-direction: column; gap: 1rem;
+      transition: border-color 0.2s, transform 0.2s; opacity: 1; transform: none;
+    }
+    .matrix-card:hover { border-color: rgba(0,212,255,0.3); transform: translateY(-2px); }
+    .matrix-card-top { display: flex; align-items: flex-start; gap: 0.9rem; }
+    .matrix-icon { font-size: 1.8rem; flex-shrink: 0; }
+    .matrix-card h3 { font-size: 1.05rem; color: var(--text-bright); line-height: 1.35; }
+    .matrix-tag {
+      font-family: var(--font-mono); font-size: 0.65rem; padding: 0.15rem 0.55rem;
+      background: rgba(0,212,255,0.06); border: 1px solid var(--border); border-radius: 3px;
+      color: var(--text-dim); align-self: flex-start;
+    }
+    .matrix-card p.matrix-desc { font-size: 0.875rem; color: var(--text-dim); line-height: 1.7; flex-grow: 1; }
+    .matrix-open {
+      font-family: var(--font-mono); font-size: 0.78rem; padding: 0.5rem 1rem; border-radius: 4px;
+      background: var(--accent); color: #000; border: 1px solid var(--accent); transition: all 0.2s;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; align-self: flex-start;
+    }
+    .matrix-open:hover { background: transparent; color: var(--accent); }
+    .matrix-note {
+      font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim);
+      border: 1px dashed var(--border); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 2rem; line-height: 1.8;
+    }
+    .matrix-note b { color: var(--accent2); }
+    @media (max-width: 900px) { .matrix-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { .matrix-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="scanlines"></div><div class="noise"></div>
+
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <div class="nav-right">
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html" class="nav-link">~/home</a></li>
+          <li><a href="articles.html" class="nav-link">~/articles</a></li>
+          <li><a href="tools.html" class="nav-link">~/tools</a></li>
+          <li><a href="matrix.html" class="nav-link active">~/matrix</a></li>
+          <li><a href="index.html#contact" class="nav-link">~/contact</a></li>
+        </ul>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">☾</button>
+        <button class="hamburger" id="hamburger"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="page-hero">
+    <div class="page-hero-inner">
+      <span class="page-tag">// field reference library</span>
+      <h1 class="page-title">Matrix</h1>
+      <p class="page-desc">Working reference matrices built from real casework — artefact value, attack detection, and investigative process, kept current as tooling and Windows internals change.</p>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="matrix-note">// each matrix opens as its own standalone reference page — <b>use your browser's back button</b> to return here.</div>
+      <div class="matrix-grid">
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🪟</span><h3>Windows Forensics — Artefact Value Matrix</h3></div>
+          <span class="matrix-tag">Windows</span>
+          <p class="matrix-desc">What can this artefact prove, and what are its limits? A row-by-row investigative decision-making reference across execution, persistence, and file/folder activity artefacts.</p>
+          <a href="matrix/windows-forensics-artefact-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🧠</span><h3>Windows Memory Forensics — DFIR Reference</h3></div>
+          <span class="matrix-tag">Memory</span>
+          <p class="matrix-desc">Artefact matrix, analysis methodology, and analyst mental model for memory forensics with Volatility 3.</p>
+          <a href="matrix/windows-memory-forensics-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">⚙</span><h3>Windows Process — Forensic Reference</h3></div>
+          <span class="matrix-tag">Windows</span>
+          <p class="matrix-desc">What parent/child process relationships tell you during incident response — legitimate lineage vs. living-off-the-land abuse.</p>
+          <a href="matrix/windows-forensic-processes.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🏰</span><h3>Active Directory — Attacks, Detection &amp; Forensics Matrix</h3></div>
+          <span class="matrix-tag">Active Directory</span>
+          <p class="matrix-desc">Attack mechanics, detection event IDs, forensic artefacts, IOCs, and mitigations for common AD attack techniques.</p>
+          <a href="matrix/ad-forensics-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🗡</span><h3>AD Attacks — DFIR Quick Reference</h3></div>
+          <span class="matrix-tag">Active Directory</span>
+          <p class="matrix-desc">13 common AD attack techniques, sourced from HTB Academy's Windows Attacks &amp; Defense — click-to-expand cards per technique.</p>
+          <a href="matrix/ad-attacks-dfir-reference.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🐧</span><h3>Linux OS — Forensics Log &amp; Artefact Value Matrix</h3></div>
+          <span class="matrix-tag">Linux</span>
+          <p class="matrix-desc">Quick-reference for incident response and forensic investigation of Linux systems — logs, artefacts, and what they prove.</p>
+          <a href="matrix/linux-forensics-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">☁</span><h3>vCenter / ESXi — Forensics Log &amp; Artefact Value Matrix</h3></div>
+          <span class="matrix-tag">Virtualization</span>
+          <p class="matrix-desc">Quick-reference guide for incident response and forensic investigation of VMware vSphere environments.</p>
+          <a href="matrix/vcenter-esxi-forensics-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🔬</span><h3>Malware Analysis — PE Sections Matrix</h3></div>
+          <span class="matrix-tag">Malware</span>
+          <p class="matrix-desc">Pre-analysis packing checks, CLI triage tools, and section-level indicators for portable executable analysis.</p>
+          <a href="matrix/malware-analysis-pe-sections.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-top"><span class="matrix-icon">🎯</span><h3>Patient Zero Investigation Matrix</h3></div>
+          <span class="matrix-tag">Process</span>
+          <p class="matrix-desc">A sequenced process for tracing a breach back to its root-cause infection — from open-source recon you can run today, to internal correlation requiring authorization.</p>
+          <a href="matrix/patient-zero-matrix.html" target="_blank" rel="noopener" class="matrix-open">Open Matrix &#8599;</a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container"><div class="footer-inner">
+      <span class="footer-logo">[pelirufus.sh]</span>
+      <span class="footer-copy">Built with coffee and curiosity &middot; Hosted on GitHub Pages</span>
+      <span class="footer-tag">// stay curious. stay dangerous.</span>
+    </div></div>
+  </footer>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

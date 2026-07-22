@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows Process — Forensic Reference</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #1c2330;
+    --border: #2a3341;
+    --border2: #30394a;
+    --text: #e0e6f0;
+    --text2: #8b97a8;
+    --text3: #5a6677;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --accent: #58a6ff;
+
+    --tag-red-bg: #2d1117; --tag-red: #f47067; --tag-red-border: #5a1a22;
+    --tag-amber-bg: #2d1f00; --tag-amber: #e3b341; --tag-amber-border: #5a3d00;
+    --tag-teal-bg: #0d2b1e; --tag-teal: #3fb68b; --tag-teal-border: #1a4d35;
+    --tag-blue-bg: #0d1f33; --tag-blue: #58a6ff; --tag-blue-border: #1a3a5c;
+    --tag-purple-bg: #1e1433; --tag-purple: #a78bfa; --tag-purple-border: #3a2660;
+    --tag-new-bg: #0d2b1e; --tag-new: #3fb68b; --tag-new-border: #1a4d35;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    padding: 28px 32px 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .header-left p {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 3px;
+    font-family: var(--mono);
+  }
+
+  /* SEARCH */
+  .search-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text3);
+    pointer-events: none;
+    font-size: 13px;
+  }
+  #search {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 8px 14px 8px 34px;
+    width: 280px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search::placeholder { color: var(--text3); }
+  #search:focus { border-color: var(--accent); }
+  @media (max-width: 600px) { #search { width: 100%; } .search-wrap { width: 100%; } }
+
+  /* FILTER PILLS */
+  .filter-bar {
+    padding: 14px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: var(--bg);
+  }
+  .filter-pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-pill.active { background: var(--accent); border-color: var(--accent); color: #0d1117; font-weight: 600; }
+
+  /* MAIN */
+  main {
+    padding: 28px 32px 60px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* SECTION */
+  .section { margin-bottom: 40px; }
+  .section-heading {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-count {
+    font-size: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 1px 7px;
+    color: var(--text3);
+    font-weight: 400;
+  }
+
+  /* GRID */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
+
+  /* CARD */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.15s, transform 0.1s;
+  }
+  .card:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .card.new-entry { border-color: #1a4d35; }
+  .card.hidden { display: none; }
+
+  .card-header {
+    padding: 10px 14px 9px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .badge-user   { background:#0d1f33; color:#58a6ff; border:1px solid #1a3a5c; }
+  .badge-rdp    { background:#2d1f00; color:#e3b341; border:1px solid #5a3d00; }
+  .badge-svc    { background:#1e1433; color:#a78bfa; border:1px solid #3a2660; }
+  .badge-sched  { background:#2d1f00; color:#e3b341; border:1px solid #5a3d00; }
+  .badge-sus    { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-sec    { background:#1e1433; color:#a78bfa; border:1px solid #3a2660; }
+  .badge-srv    { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-ad     { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-sys    { background:#0d2b1e; color:#3fb68b; border:1px solid #1a4d35; }
+  .badge-recon  { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-lolbin { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-persist{ background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+  .badge-shadow { background:#2d1117; color:#f47067; border:1px solid #5a1a22; }
+
+  .proc {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .new-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--tag-new-bg);
+    color: var(--tag-new);
+    border: 1px solid var(--tag-new-border);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .card-body { padding: 11px 14px 13px; }
+  .meaning {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .desc {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.65;
+    margin-bottom: 10px;
+  }
+  .desc code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--bg3);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--accent);
+  }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 2px 7px;
+    border-radius: 5px;
+    border: 1px solid;
+  }
+  .tag.red    { background:var(--tag-red-bg);    color:var(--tag-red);    border-color:var(--tag-red-border); }
+  .tag.amber  { background:var(--tag-amber-bg);  color:var(--tag-amber);  border-color:var(--tag-amber-border); }
+  .tag.teal   { background:var(--tag-teal-bg);   color:var(--tag-teal);   border-color:var(--tag-teal-border); }
+  .tag.blue   { background:var(--tag-blue-bg);   color:var(--tag-blue);   border-color:var(--tag-blue-border); }
+  .tag.purple { background:var(--tag-purple-bg); color:var(--tag-purple); border-color:var(--tag-purple-border); }
+
+  /* NO RESULTS */
+  #no-results {
+    display: none;
+    text-align: center;
+    padding: 60px 20px;
+    font-family: var(--mono);
+    color: var(--text3);
+    font-size: 13px;
+  }
+  #no-results span { display: block; font-size: 28px; margin-bottom: 12px; }
+
+  /* EMPTY SECTION */
+  .section.empty { display: none; }
+
+  /* STATS BAR */
+  .stats-bar {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    padding: 0 0 20px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .stat-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 5px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-left">
+    <h1>Windows Process — Forensic Reference</h1>
+    <p>What parent processes tell you during incident response</p>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" id="search" placeholder="Search process, meaning, tag…" autocomplete="off" spellcheck="false">
+  </div>
+</header>
+
+<div class="filter-bar">
+  <button class="filter-pill active" data-filter="all">All</button>
+  <button class="filter-pill" data-filter="user-interaction">User Interaction</button>
+  <button class="filter-pill" data-filter="service">Service</button>
+  <button class="filter-pill" data-filter="script-lolbin">Script / LOLBin</button>
+  <button class="filter-pill" data-filter="recon-enum">Recon &amp; Enum</button>
+  <button class="filter-pill" data-filter="persistence">Persistence</button>
+  <button class="filter-pill" data-filter="defense-evasion">Defense Evasion</button>
+  <button class="filter-pill" data-filter="server-ad">Server &amp; AD</button>
+  <button class="filter-pill" data-filter="kernel-auth">Kernel &amp; Auth</button>
+</div>
+
+<main>
+  <div class="stats-bar">
+    <span><span class="stat-dot"></span><span id="visible-count">27</span> processes</span>
+    <span>★ = added this session</span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ USER INTERACTION -->
+  <section class="section" data-section="user-interaction">
+    <div class="section-heading">User Interaction <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card" data-category="user-interaction" data-search="explorer.exe user interaction local rdp inbound shell double click start menu interactive session">
+        <div class="card-header">
+          <span class="badge badge-user">User interaction</span>
+          <span class="proc">explorer.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Direct user action — local or inbound RDP</div>
+          <div class="desc">Shell-launched process. Someone double-clicked, used the Start menu, or is operating via an inbound RDP session. The user is present on this machine as the target/destination.</div>
+          <div class="tags">
+            <span class="tag teal">Interactive session</span>
+            <span class="tag blue">Inbound RDP target</span>
+            <span class="tag amber">Pivot if malware child</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="user-interaction" data-search="mstsc.exe rdp remote desktop client outbound lateral movement pivot source mstsc">
+        <div class="card-header">
+          <span class="badge badge-rdp">RDP client</span>
+          <span class="proc">mstsc.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">This machine initiated an outbound RDP session</div>
+          <div class="desc">The RDP client was used to connect to another host. This machine is the source/pivot point, not the target. Check <code>HKCU\...\Terminal Server Client\Servers</code> for destination history. Workstation origin = strong lateral movement signal.</div>
+          <div class="tags">
+            <span class="tag amber">Outbound RDP</span>
+            <span class="tag red">Lateral movement source</span>
+            <span class="tag teal">Normal on jump servers</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="user-interaction" data-search="rdpclip.exe rdp clipboard session active exfiltration silent channel rdpclip">
+        <div class="card-header">
+          <span class="badge badge-rdp">RDP session</span>
+          <span class="proc">rdpclip.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Active RDP session with clipboard sharing enabled</div>
+          <div class="desc">One instance per live RDP session. Confirms an active or very recent session. Clipboard is a silent exfil channel — no 4663 events for clipboard data movement. Absence means clipboard sharing disabled or non-standard client.</div>
+          <div class="tags">
+            <span class="tag teal">Session presence marker</span>
+            <span class="tag red">Clipboard exfil channel</span>
+            <span class="tag red">Masquerading target</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SERVICE & BACKGROUND -->
+  <section class="section" data-section="service">
+    <div class="section-heading">Service &amp; Background <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card" data-category="service" data-search="svchost.exe service host dll wmi dcom background service hosting group -k flag">
+        <div class="card-header">
+          <span class="badge badge-svc">Service host</span>
+          <span class="proc">svchost.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">A DLL-based Windows service spawned a child</div>
+          <div class="desc">Check the <code>-k</code> flag to identify the hosting service group. Common for WMI, Task Scheduler, and service-based malware pivots. Always verify the hosting DLL in the registry.</div>
+          <div class="tags">
+            <span class="tag teal">Background service</span>
+            <span class="tag amber">Check hosting DLL</span>
+            <span class="tag red">WMI/DCOM abuse</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="service" data-search="services.exe service control manager SCM exe-based service persistence boot registry">
+        <div class="card-header">
+          <span class="badge badge-svc">SCM</span>
+          <span class="proc">services.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">SCM started an .exe-based service directly</div>
+          <div class="desc">Service Control Manager launched a new service binary. Unexpected children are a strong indicator of malware persistence — register as a service and SCM starts it on boot.</div>
+          <div class="tags">
+            <span class="tag teal">Boot/on-demand service</span>
+            <span class="tag red">Persistence indicator</span>
+            <span class="tag amber">Verify in registry</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="service persistence" data-search="taskeng.exe taskhostw.exe scheduled task persistence 4698 4702 trigger">
+        <div class="card-header">
+          <span class="badge badge-sched">Task Scheduler</span>
+          <span class="proc">taskeng.exe / taskhostw.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">A scheduled task fired a child process</div>
+          <div class="desc">Correlate with Event IDs 4698/4702. Children without corresponding tasks in the registry or a matching trigger are a red flag for task-based persistence. Top persistence mechanism in modern intrusions.</div>
+          <div class="tags">
+            <span class="tag teal">Expected on some systems</span>
+            <span class="tag red">Top persistence vector</span>
+            <span class="tag amber">Check task XML/registry</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SCRIPT & LOLBIN -->
+  <section class="section" data-section="script-lolbin">
+    <div class="section-heading">Script Engines &amp; LOLBins <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card" data-category="script-lolbin" data-search="cmd.exe powershell.exe command interpreter shell encoded obfuscated office browser parent">
+        <div class="card-header">
+          <span class="badge badge-sus">Shell</span>
+          <span class="proc">cmd.exe / powershell.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Command interpreter spawned a process</div>
+          <div class="desc">Context is everything. Normal under <code>explorer.exe</code>. Immediate alert under Office apps, browsers, or <code>java.exe</code>. Encoded/obfuscated PowerShell args (<code>-enc</code>) are a classic malware indicator.</div>
+          <div class="tags">
+            <span class="tag blue">Normal under explorer</span>
+            <span class="tag red">Office/browser parent → alert</span>
+            <span class="tag amber">Check cmdline encoding</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="script-lolbin" data-search="wscript.exe cscript.exe vbscript jscript windows script host phishing dropper macro">
+        <div class="card-header">
+          <span class="badge badge-sus">Script engine</span>
+          <span class="proc">wscript.exe / cscript.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">VBScript or JScript execution</div>
+          <div class="desc">Rarely legitimate today. Frequently seen in phishing payloads and dropper chains. Especially suspicious as a child of <code>outlook.exe</code> or <code>winword.exe</code>. Often chained with <code>mshta.exe</code>.</div>
+          <div class="tags">
+            <span class="tag red">Phishing/dropper</span>
+            <span class="tag red">Living-off-the-land</span>
+            <span class="tag amber">Macro pivot</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="script-lolbin" data-search="mshta.exe hta html application host vbscript jscript url remote">
+        <div class="card-header">
+          <span class="badge badge-lolbin">LOLBin</span>
+          <span class="proc">mshta.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">HTA host — almost always abused</div>
+          <div class="desc">Microsoft HTML Application host. Rarely has legitimate use today. Executes inline VBScript/JScript, often from a remote URL argument. Almost always worth investigating when seen.</div>
+          <div class="tags">
+            <span class="tag red">High suspicion</span>
+            <span class="tag red">Remote script execution</span>
+            <span class="tag amber">Inspect URL argument</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="script-lolbin" data-search="wmic.exe wmi lateral movement process call create no powershell">
+        <div class="card-header">
+          <span class="badge badge-lolbin">LOLBin</span>
+          <span class="proc">wmic.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">WMI-based lateral movement or execution</div>
+          <div class="desc">Classic lateral movement via <code>process call create</code>. Spawns processes without touching cmd/powershell. Deprecated in Win11 but still widely present. Check spawning parent and full args.</div>
+          <div class="tags">
+            <span class="tag red">Lateral movement</span>
+            <span class="tag red">No cmd/PS artefacts</span>
+            <span class="tag teal">Some admin use</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="script-lolbin defense-evasion" data-search="certutil.exe certificate utility decode base64 download lolbin malware dropper certutil">
+        <div class="card-header">
+          <span class="badge badge-lolbin">LOLBin</span>
+          <span class="proc">certutil.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Certificate tool repurposed as downloader or decoder</div>
+          <div class="desc">Legitimate use: manage certificates and CRLs. Abuse: <code>certutil -urlcache -split -f</code> downloads files from the internet; <code>certutil -decode</code> decodes base64-encoded payloads. Both techniques bypass many proxy policies. Any use outside PKI administration is suspicious.</div>
+          <div class="tags">
+            <span class="tag red">File download</span>
+            <span class="tag red">Base64 decode</span>
+            <span class="tag amber">Check -urlcache/-decode args</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="script-lolbin defense-evasion" data-search="rundll32.exe dll execution proxy lolbin arbitrary code no pe loader">
+        <div class="card-header">
+          <span class="badge badge-lolbin">LOLBin</span>
+          <span class="proc">rundll32.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Arbitrary DLL execution — no standalone PE required</div>
+          <div class="desc">Loads and calls an export from any DLL. Commonly abused to run malicious DLLs without dropping a standalone .exe — evades detections that focus on PE execution. Watch for <code>rundll32 javascript:</code> (scriptlet abuse) or loading DLLs from <code>Temp</code>/<code>AppData</code>.</div>
+          <div class="tags">
+            <span class="tag red">DLL proxy execution</span>
+            <span class="tag red">Scriptlet abuse</span>
+            <span class="tag amber">Check DLL path &amp; export</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="script-lolbin" data-search="winword excel outlook office macro embedded object phishing initial access document execution">
+        <div class="card-header">
+          <span class="badge badge-sus">Document exec</span>
+          <span class="proc">winword / excel / outlook</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Macro or embedded object spawned a process</div>
+          <div class="desc">Office spawning shells, script engines, or network tools is a signature of macro-based malware or document exploits. The chain Office → cmd/powershell/wscript → network tool is one of the most common initial-access patterns.</div>
+          <div class="tags">
+            <span class="tag red">Macro execution</span>
+            <span class="tag red">Phishing initial access</span>
+            <span class="tag amber">Check child cmdline</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ RECON & ENUMERATION -->
+  <section class="section" data-section="recon-enum">
+    <div class="section-heading">Recon &amp; Enumeration <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card new-entry" data-category="recon-enum" data-search="net.exe net1.exe enumeration user group share localgroup domain accounts recon net user net group">
+        <div class="card-header">
+          <span class="badge badge-recon">Recon</span>
+          <span class="proc">net.exe / net1.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Domain and local account/group enumeration</div>
+          <div class="desc">Built-in tool for managing users, groups, shares, and sessions. <code>net user /domain</code>, <code>net group "Domain Admins"</code>, and <code>net localgroup administrators</code> are textbook attacker recon commands. <code>net1.exe</code> is a functional alias sometimes used to evade simple detections on <code>net.exe</code>. Spawning parent is key — recon commands from <code>cmd.exe</code> under an Office app is a red flag.</div>
+          <div class="tags">
+            <span class="tag red">Domain enumeration</span>
+            <span class="tag red">Privilege discovery</span>
+            <span class="tag amber">Check full arguments</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="recon-enum" data-search="attrib.exe attribute file hidden system read-only malware hide files attrib">
+        <div class="card-header">
+          <span class="badge badge-recon">Defense evasion</span>
+          <span class="proc">attrib.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">File attributes being modified — likely hiding malware artefacts</div>
+          <div class="desc">Sets or clears file attributes: Hidden (<code>+H</code>), System (<code>+S</code>), Read-only (<code>+R</code>). Legitimate admin use exists but is rare in typical operations. Attackers use <code>attrib +H +S</code> to hide dropped files, payloads, or persistence artefacts from casual inspection and Explorer view.</div>
+          <div class="tags">
+            <span class="tag red">Hiding malware files</span>
+            <span class="tag amber">Check +H +S arguments</span>
+            <span class="tag teal">Rare legitimate use</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ PERSISTENCE -->
+  <section class="section" data-section="persistence">
+    <div class="section-heading">Persistence Mechanisms <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card new-entry" data-category="persistence service" data-search="sc.exe service control create start stop modify persistence install malicious service sc config sc create">
+        <div class="card-header">
+          <span class="badge badge-persist">Persistence</span>
+          <span class="proc">sc.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Service being created, modified, or started via command line</div>
+          <div class="desc">Service Control utility. <code>sc create</code> installs a new service (classic persistence mechanism), <code>sc config</code> modifies an existing one (hijacking), <code>sc start</code> / <code>sc stop</code> controls execution. Watch for services pointing to <code>Temp</code>, <code>AppData</code>, or UNC paths. Correlate with Event ID 7045 (new service installed).</div>
+          <div class="tags">
+            <span class="tag red">Service-based persistence</span>
+            <span class="tag red">Service hijacking</span>
+            <span class="tag amber">Correlate 7045</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="persistence" data-search="schtasks.exe scheduled task create persistence /create /run /delete task scheduler schtasks">
+        <div class="card-header">
+          <span class="badge badge-persist">Persistence</span>
+          <span class="proc">schtasks.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Scheduled task being created or manipulated via command line</div>
+          <div class="desc">The command-line interface to Task Scheduler. <code>/create</code> establishes persistence; <code>/run</code> triggers immediate execution; <code>/delete</code> may indicate cleanup. Frequently used by malware to survive reboots. Correlate with Event ID 4698 (task created) and the XML definition in <code>C:\Windows\System32\Tasks\</code>.</div>
+          <div class="tags">
+            <span class="tag red">Scheduled persistence</span>
+            <span class="tag red">Post-exploitation cleanup</span>
+            <span class="tag amber">Correlate 4698/4702</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ DEFENSE EVASION -->
+  <section class="section" data-section="defense-evasion">
+    <div class="section-heading">Defense Evasion &amp; Impact <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card new-entry" data-category="defense-evasion" data-search="vssadmin.exe volume shadow copy delete resize ransomware anti-forensics backup destruction vssadmin delete shadows">
+        <div class="card-header">
+          <span class="badge badge-shadow">Anti-forensics / Ransomware</span>
+          <span class="proc">vssadmin.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Shadow copy manipulation — a ransomware and anti-forensics hallmark</div>
+          <div class="desc"><code>vssadmin delete shadows /all /quiet</code> is one of the most recognisable ransomware pre-encryption commands — it destroys all Volume Shadow Copies, eliminating Windows' built-in backup recovery. Also used to resize shadow storage to prevent future snapshots. Any execution outside a documented backup management process is a critical alert.</div>
+          <div class="tags">
+            <span class="tag red">Ransomware pre-encryption</span>
+            <span class="tag red">Backup destruction</span>
+            <span class="tag red">Immediate escalation</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="defense-evasion" data-search="vssvc.exe volume shadow copy service provider backup legitimate baseline expected">
+        <div class="card-header">
+          <span class="badge badge-shadow">VSS service</span>
+          <span class="proc">vssvc.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Volume Shadow Copy Service provider is active</div>
+          <div class="desc">The legitimate VSS service process — present during snapshot creation or backup operations. Normally benign, but its presence alongside <code>vssadmin.exe</code> or unusual child processes is worth noting. Malware occasionally injects into or masquerades as <code>vssvc.exe</code> to access locked files (e.g., database files, registry hives) during exfiltration. Always verify image path and signature.</div>
+          <div class="tags">
+            <span class="tag teal">Normal during backups</span>
+            <span class="tag amber">Injection target</span>
+            <span class="tag amber">Locked-file access vector</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="defense-evasion script-lolbin" data-search="gpmc.msc group policy management console gpo malicious push domain-wide gpmc">
+        <div class="card-header">
+          <span class="badge badge-ad">AD / GPO</span>
+          <span class="proc">mmc.exe gpmc.msc</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Group Policy Management Console opened — domain-wide policy control</div>
+          <div class="desc">Loaded as an MMC snap-in. From here an attacker can create or modify GPOs that execute scripts on every domain-joined machine simultaneously — the highest-impact lateral movement available. Also used to disable AV/EDR, enable WinRM, or add local admin accounts across the estate. Correlate with Event ID 5136 (directory object modified).</div>
+          <div class="tags">
+            <span class="tag red">Domain-wide execution</span>
+            <span class="tag red">AV/EDR disable via GPO</span>
+            <span class="tag amber">Correlate 5136</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="defense-evasion server-ad" data-search="adsiedit.msc ldap raw attribute editor dcsync delegation abuse adsiedit">
+        <div class="card-header">
+          <span class="badge badge-ad">AD / Raw LDAP</span>
+          <span class="proc">mmc.exe adsiedit.msc</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Raw LDAP attribute editor — DCSync and delegation setup</div>
+          <div class="desc">ADSI Edit gives read/write access to any LDAP attribute directly. Used to grant DCSync rights by modifying <code>nTSecurityDescriptor</code> on the domain object, configure unconstrained/constrained delegation, or set <code>msDS-AllowedToDelegateTo</code>. No PowerShell trace generated. The most dangerous GUI tool in an AD environment.</div>
+          <div class="tags">
+            <span class="tag red">DCSync rights setup</span>
+            <span class="tag red">Delegation abuse</span>
+            <span class="tag red">No PS artefacts</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SECURITY & DOWNLOAD -->
+  <section class="section" data-section="server-ad">
+    <div class="section-heading">Security &amp; Download <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card new-entry" data-category="server-ad defense-evasion" data-search="smartscreen.exe mark of the web motw zone identifier download execution bypass iso zip lnk smartscreen">
+        <div class="card-header">
+          <span class="badge badge-sec">Security check</span>
+          <span class="proc">smartscreen.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Downloaded file with Mark of the Web was just executed</div>
+          <div class="desc">Fires when a file with <code>Zone.Identifier</code> ADS is run. Confirms external-origin execution. Absence before a suspicious execution means MOTW was stripped — a bypass indicator. The <code>HostUrl</code> field in the ADS contains the original download URL.</div>
+          <div class="tags">
+            <span class="tag purple">Mark of the Web</span>
+            <span class="tag amber">Download exec marker</span>
+            <span class="tag red">Absence = MOTW bypass</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ SERVER & AD -->
+  <section class="section" data-section="server-ad">
+    <div class="section-heading">Server &amp; Active Directory <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card new-entry" data-category="server-ad" data-search="servermanager.exe server manager windows server admin interactive logon gui privileged">
+        <div class="card-header">
+          <span class="badge badge-srv">High-value target</span>
+          <span class="proc">ServerManager.exe</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Server OS + admin account + interactive session — three signals in one</div>
+          <div class="desc">Only exists on Windows Server; auto-launches for admin-level users at logon. On a DC outside business hours this is an immediate escalation. Spawning <code>mmc.exe</code> opens the GUI admin toolchain. On a workstation it should never appear — if it does, it's masquerading malware.</div>
+          <div class="tags">
+            <span class="tag red">Server OS confirmed</span>
+            <span class="tag red">Admin-level session</span>
+            <span class="tag amber">Lateral movement destination</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card new-entry" data-category="server-ad" data-search="dsa.msc active directory users computers aduc domain admins password reset user creation spn kerberoasting 4728 4724 4720">
+        <div class="card-header">
+          <span class="badge badge-ad">AD recon / modification</span>
+          <span class="proc">mmc.exe dsa.msc</span>
+          <span class="new-pill">★ NEW</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Active Directory Users &amp; Computers — full domain GUI access</div>
+          <div class="desc">Loads as <code>dsadmin.dll</code> inside <code>mmc.exe</code>. Enables silent DA group adds (4728), password resets (4724), account creation (4720), SPN setting for Kerberoasting, and full domain recon. No PowerShell artefacts. Correlate MMC process timeline against AD audit log to reconstruct actions.</div>
+          <div class="tags">
+            <span class="tag red">Tier-0 AD access</span>
+            <span class="tag red">Domain recon &amp; modification</span>
+            <span class="tag amber">GUI — low cmdline footprint</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════ KERNEL & AUTH -->
+  <section class="section" data-section="kernel-auth">
+    <div class="section-heading">Kernel &amp; Authentication <span class="section-count"></span></div>
+    <div class="cards">
+
+      <div class="card" data-category="kernel-auth" data-search="lsass.exe local security authority credential dumping mimikatz process injection authentication never spawns children">
+        <div class="card-header">
+          <span class="badge badge-sys">Auth process</span>
+          <span class="proc">lsass.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Auth process — should NEVER spawn children</div>
+          <div class="desc">Handles authentication. Never spawns child processes under normal conditions. Any child almost certainly indicates credential dumping (Mimikatz-style) or injection into the process. Also watch for unexpected <code>lsass</code> memory reads (4656/4663 on the process object).</div>
+          <div class="tags">
+            <span class="tag red">Child = automatic alert</span>
+            <span class="tag red">Credential dumping</span>
+            <span class="tag red">Process injection</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="kernel-auth" data-search="winlogon.exe logon handler logonui userinit sticky keys accessibility backdoor injection">
+        <div class="card-header">
+          <span class="badge badge-sys">Logon</span>
+          <span class="proc">winlogon.exe</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Interactive logon handler</div>
+          <div class="desc">Handles Ctrl+Alt+Delete, logon/logoff, screen lock. Expected children: <code>LogonUI.exe</code> and <code>userinit.exe</code> only. Anything else points to accessibility feature backdoors (Sticky Keys, Narrator) or process injection.</div>
+          <div class="tags">
+            <span class="tag blue">Normal: userinit, LogonUI</span>
+            <span class="tag red">Other children → alert</span>
+            <span class="tag red">Accessibility backdoor</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-category="kernel-auth" data-search="system pid 4 kernel driver rootkit smss.exe only expected child kernel exploit">
+        <div class="card-header">
+          <span class="badge badge-sys">Kernel</span>
+          <span class="proc">System (PID 4)</span>
+        </div>
+        <div class="card-body">
+          <div class="meaning">Kernel or kernel-mode driver spawned a process</div>
+          <div class="desc">Expected child is <code>smss.exe</code> only. Anything else warrants deep scrutiny — likely a kernel exploit, rootkit, or driver-level persistence. Userland processes with System as parent are a strong indicator of privilege escalation via kernel.</div>
+          <div class="tags">
+            <span class="tag teal">Normal: smss.exe only</span>
+            <span class="tag red">Other children → rootkit?</span>
+            <span class="tag red">Kernel exploit indicator</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div id="no-results">
+    <span>⌕</span>
+    No processes match your search.
+  </div>
+
+</main>
+
+<script>
+  const searchInput = document.getElementById('search');
+  const filterPills = document.querySelectorAll('.filter-pill');
+  const cards = document.querySelectorAll('.card');
+  const sections = document.querySelectorAll('.section');
+  const noResults = document.getElementById('no-results');
+  const visibleCount = document.getElementById('visible-count');
+
+  let currentFilter = 'all';
+  let currentSearch = '';
+
+  function updateSectionCounts() {
+    sections.forEach(section => {
+      const visibleCards = section.querySelectorAll('.card:not(.hidden)');
+      const countEl = section.querySelector('.section-count');
+      if (countEl) countEl.textContent = visibleCards.length;
+      if (visibleCards.length === 0) {
+        section.classList.add('empty');
+      } else {
+        section.classList.remove('empty');
+      }
+    });
+  }
+
+  function runFilter() {
+    let visible = 0;
+    const query = currentSearch.toLowerCase().trim();
+
+    cards.forEach(card => {
+      const searchData = (card.dataset.search || '').toLowerCase();
+      const procText = (card.querySelector('.proc')?.textContent || '').toLowerCase();
+      const meaningText = (card.querySelector('.meaning')?.textContent || '').toLowerCase();
+      const descText = (card.querySelector('.desc')?.textContent || '').toLowerCase();
+      const categories = (card.dataset.category || '').toLowerCase();
+
+      const matchesFilter = currentFilter === 'all' || categories.includes(currentFilter);
+      const matchesSearch = !query ||
+        searchData.includes(query) ||
+        procText.includes(query) ||
+        meaningText.includes(query) ||
+        descText.includes(query);
+
+      if (matchesFilter && matchesSearch) {
+        card.classList.remove('hidden');
+        visible++;
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+
+    visibleCount.textContent = visible;
+    noResults.style.display = visible === 0 ? 'block' : 'none';
+    updateSectionCounts();
+  }
+
+  searchInput.addEventListener('input', e => {
+    currentSearch = e.target.value;
+    runFilter();
+  });
+
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentFilter = pill.dataset.filter;
+      runFilter();
+    });
+  });
+
+  // Initial section counts
+  updateSectionCounts();
+</script>
+</body>
+</html>

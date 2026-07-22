@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vCenter / ESXi Forensics — Log & Artefact Value Matrix</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; padding: 2rem; font-size: 13px; line-height: 1.5; }
+  h1 { font-size: 20px; font-weight: 600; color: #f8fafc; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 2rem; }
+  .arch-note { font-size: 11px; color: #475569; background: #161b27; border: 1px solid #1e293b; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 2rem; line-height: 1.6; }
+  .arch-note strong { color: #94a3b8; }
+  .section { margin-bottom: 2.5rem; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #475569; margin-bottom: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid #1e293b; }
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #1e293b; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  thead tr { background: #161b27; }
+  thead th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; white-space: nowrap; border-bottom: 1px solid #1e293b; }
+  tbody tr { border-bottom: 1px solid #1a2030; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #141923; }
+  td { padding: 9px 12px; vertical-align: top; color: #cbd5e1; font-size: 12px; }
+  td:first-child { font-weight: 600; color: #e2e8f0; white-space: nowrap; min-width: 180px; }
+  td.path { font-family: 'Courier New', monospace; font-size: 11px; color: #7dd3fc; }
+  td.caveat { color: #64748b; font-size: 11px; max-width: 340px; }
+  .yes { color: #4ade80; font-weight: 600; }
+  .no { color: #f87171; font-weight: 600; }
+  .part { color: #fbbf24; font-weight: 600; }
+  .tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+  .tag-auth   { background: #1e3a5f; color: #60a5fa; }
+  .tag-exec   { background: #14361f; color: #4ade80; }
+  .tag-vm     { background: #2a1f3d; color: #a78bfa; }
+  .tag-net    { background: #1a2d1a; color: #86efac; }
+  .tag-threat { background: #3b1a1a; color: #fca5a5; }
+  .tag-vcenter{ background: #1e2a3a; color: #7dd3fc; }
+  .legend { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; }
+  .dot-yes  { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .dot-no   { width: 8px; height: 8px; border-radius: 50%; background: #f87171; }
+  .dot-part { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+  footer { font-size: 11px; color: #334155; margin-top: 2rem; border-top: 1px solid #1e293b; padding-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>vCenter / ESXi — Forensics Log &amp; Artefact Value Matrix</h1>
+<p class="subtitle">Quick-reference guide for incident response and forensic investigation of VMware vSphere environments.</p>
+
+<div class="arch-note">
+  <strong>Architecture context:</strong> ESXi is a bare-metal Type-1 hypervisor. vCenter Server (VCSA) is a Linux appliance (Photon OS) managing one or more ESXi hosts. Logs exist at three tiers: <strong>vCenter</strong> (management plane), <strong>ESXi host</strong> (hypervisor plane), and <strong>VM guest</strong> (per-VM). ESXi logs are stored on a RAM-backed ramdisk by default — they do NOT survive a reboot unless a persistent scratch location is configured. The vmsyslogd daemon writes logs; killing it (a known attacker technique) stops all local log writing. Always prioritise collecting logs via support bundle (<code>vm-support</code>) or remote syslog before any reboot. Collection tool: <strong>DFIR4vSphere</strong> (ANSSI-FR, PowerShell/PowerCLI). Parser: <strong>QELP</strong> (Stroz Friedberg).
+  <br><br>
+  <strong>vCenter triage priority:</strong>
+  <span style="color:#4ade80;font-weight:600;">1. VI Events</span> (structured API audit — broadest coverage) →
+  <span style="color:#4ade80;font-weight:600;">2. vpxd.log</span> (main vCenter log) →
+  <span style="color:#4ade80;font-weight:600;">3. sso-events.log</span> (authentication) →
+  <span style="color:#4ade80;font-weight:600;">4. vpostgres log</span> (if DB credential extraction suspected) →
+  <span style="color:#f59e0b;font-weight:600;">5. journalctl ⚠ secondary</span> — only when OS-level breakout is suspected, a VMware service crashed with no app-log record, or VCSA is being treated as a compromised Linux host.
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot-yes"></div> Strong / Yes</div>
+  <div class="legend-item"><div class="dot-part"></div> Partial / Conditional</div>
+  <div class="legend-item"><div class="dot-no"></div> No / Absent</div>
+</div>
+
+<!-- ── VCENTER LOGS ──────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">vCenter Server (VCSA) Logs — /var/log/vmware/</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Log file</th>
+        <th>Path (VCSA)</th>
+        <th>Persists reboot?</th>
+        <th>Retention</th>
+        <th>Key forensic value</th>
+        <th>Threat actor relevance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>vpxd.log <span class="tag tag-vcenter">primary</span></td>
+        <td class="path">/var/log/vmware/vpxd/vpxd.log</td>
+        <td class="yes">Yes</td>
+        <td>Rotated — numbered vpxd-N.log</td>
+        <td>Main vCenter log. All vSphere client connections, API calls, internal tasks/events, vpxa communication with ESXi hosts, DB operations. First log to examine.</td>
+        <td class="caveat">Attacker logins via vSphere client, API-based VM operations (snapshot, power off, export), privilege changes all appear here. vCenter database (VCDB) queries logged here including credential extraction attempts.</td>
+      </tr>
+      <tr>
+        <td>vpxd-svcs.log <span class="tag tag-vcenter">api</span></td>
+        <td class="path">/var/log/vmware/vpxd-svcs/vpxd-svcs.log</td>
+        <td class="yes">Yes</td>
+        <td>Rotated</td>
+        <td>vCenter REST API and web services activity. Complements vpxd.log with API-layer details.</td>
+        <td class="caveat">REST API exploitation (CVE-based attacks against vCenter) will appear here. Malicious Automation via API tokens logged.</td>
+      </tr>
+      <tr>
+        <td>sso-events.log / ssoAdminServer.log <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/vmware/sso/</td>
+        <td class="yes">Yes</td>
+        <td>Rotated</td>
+        <td>SSO authentication events — logins, failures, identity source queries, token issuance. The primary authentication audit trail for vCenter.</td>
+        <td class="caveat">Brute force against vCenter SSO, stolen session token use, and identity provider manipulation all surface here. Password spraying visible as repeated failures across accounts.</td>
+      </tr>
+      <tr>
+        <td>vsphere-ui/catalina.out <span class="tag tag-vcenter">ui</span></td>
+        <td class="path">/var/log/vmware/vsphere-ui/logs/</td>
+        <td class="yes">Yes</td>
+        <td>Rotated</td>
+        <td>vSphere Web Client (HTML5) session activity. UI-initiated operations, errors, and connectivity events.</td>
+        <td class="caveat">Complements vpxd.log for UI-originated attacker actions. Web client exploitation attempts visible here.</td>
+      </tr>
+      <tr>
+        <td>vpostgres / postgresql.log <span class="tag tag-vcenter">database</span></td>
+        <td class="path">/var/log/vmware/vpostgres/</td>
+        <td class="yes">Yes</td>
+        <td>Rotated</td>
+        <td>PostgreSQL database activity for vCenter. Query logging, transaction events, startup/shutdown. VCDB contains host credentials (vpx_host table).</td>
+        <td class="caveat">Direct SQL injection or interactive VCDB queries to extract host credentials (SELECT ip_address, user_name, password FROM vpx_host) appear as LOG statements. UNC3886 / Fire Ant used this technique.</td>
+      </tr>
+      <tr>
+        <td>VI Events (vSphere API events) <span class="tag tag-vcenter">api</span></td>
+        <td class="path">vCenter DB (VCDB) — query via PowerCLI Get-VIEvent</td>
+        <td class="yes">Yes</td>
+        <td>Default 30 days (configurable)</td>
+        <td>Structured audit trail of all vSphere events: VM power on/off, snapshot create/delete, host add/remove, permission changes, login/logout. Queryable via PowerCLI.</td>
+        <td class="caveat">Most comprehensive audit source. Collect with DFIR4vSphere Start-VC_Investigation. Can sometimes retrieve events beyond configured retention. Attacker snapshot creation (for data staging) and VM export visible here.</td>
+      </tr>
+      <tr>
+        <td>audit.log (VCSA appliance) <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/audit/audit.log</td>
+        <td class="yes">Yes</td>
+        <td>Rotated</td>
+        <td>Linux-level audit log for the VCSA appliance itself. Root logins, privilege escalation, file access by system processes.</td>
+        <td class="caveat">If attacker breaks out of vCenter to the underlying Photon OS, this log captures OS-level activity. Treat VCSA as a Linux host in post-exploitation scenarios.</td>
+      </tr>
+      <tr>
+        <td>systemd journal (journalctl) <span class="tag tag-vcenter">system</span><br><small style="color:#f59e0b;font-weight:600;font-size:9px;">⚠ SECONDARY SOURCE</small></td>
+        <td class="path">/var/log/journal/ (persistent)<br>/run/log/journal/ (volatile)</td>
+        <td class="yes">Yes — Photon OS defaults to persistent</td>
+        <td>Rotated by size</td>
+        <td>OS-level unified log for all VCSA systemd services. Adds value in three specific scenarios only: (1) attacker broke out of vCenter to the underlying Photon OS shell, (2) a VMware service (vpxd, vpostgres) crashed abruptly and the application log has no record, (3) VCSA itself is being treated as a compromised Linux host. In a standard vCenter investigation — credential abuse, API calls, VM manipulation — vpxd.log and VI Events are richer and should be examined first.</td>
+        <td class="caveat">Binary format — export with <code>journalctl --no-pager &gt; journal.txt</code> before copying raw files. Useful unit filters: <code>-u vmware-vpxd</code>, <code>-u vmware-vpostgres</code>, <code>-u sshd</code>, <code>-p err</code> (errors only). Do not treat as a replacement for /var/log/vmware/ logs — it is a supplementary OS-layer source. Cross-reference timestamps with vpxd.log and sso-events.log to build the full incident timeline when OS-level activity is suspected.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── ESXI HOST LOGS ────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">ESXi Host Logs — /var/log/ (ramdisk — volatile by default)</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Log file</th>
+        <th>Path</th>
+        <th>Persists reboot?</th>
+        <th>Key forensic value</th>
+        <th>Threat actor relevance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>shell.log <span class="tag tag-exec">execution</span></td>
+        <td class="path">/var/log/shell.log<br>/scratch/log/shell.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>Every command typed in the ESXi shell, SSH sessions, and DCUI. Enable/disable events for the shell service itself. Closest equivalent to bash_history on ESXi.</td>
+        <td class="caveat">Highest forensic value for attacker activity on the host. Ransomware operators typing esxcli, vim-cmd, and crypto commands visible here. Shell enable event itself is a detection trigger.</td>
+      </tr>
+      <tr>
+        <td>auth.log <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/auth.log<br>/scratch/log/auth.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>SSH and PAM authentication — successful logins, failures, and key-based auth events. Source IP visible.</td>
+        <td class="caveat">Brute force SSH (multiple failures from same IP), then successful login = strong IOC. Root SSH logins with key (no password failure) = potential backdoor SSH key planted.</td>
+      </tr>
+      <tr>
+        <td>hostd.log <span class="tag tag-exec">management</span></td>
+        <td class="path">/var/log/hostd.log<br>/scratch/log/hostd.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>Host management service. VM tasks and events (power on/off, snapshot, clone, migrate), vSphere client connections to host directly, vpxa communication. Most operationally rich ESXi log.</td>
+        <td class="caveat">Direct host connections bypassing vCenter appear here (attacker connecting to host IP directly). VM snapshot creation for staging, VM power operations for disruption all logged. Look for unexpected user accounts or source IPs.</td>
+      </tr>
+      <tr>
+        <td>vpxa.log <span class="tag tag-vcenter">agent</span></td>
+        <td class="path">/var/log/vpxa.log<br>/scratch/log/vpxa.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>vCenter Agent on ESXi. Communication between the ESXi host and its managing vCenter. Connection state, task execution instructions received from vCenter.</td>
+        <td class="caveat">vpxa disconnect/reconnect events show when an ESXi host was detached from or re-added to vCenter. Attacker-induced disconnects visible here. Correlate with vCenter vpxd.log timestamps.</td>
+      </tr>
+      <tr>
+        <td>vmkernel.log <span class="tag tag-net">kernel</span></td>
+        <td class="path">/var/log/vmkernel.log<br>/scratch/log/vmkernel.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>VMkernel events — device discovery, storage operations, network stack, VM start/stop at kernel level, hardware errors. Low-level OS activity.</td>
+        <td class="caveat">NFC (Network File Copy) connections for VM data transfer appear here. Mass VM shutdown events (pre-ransomware encryption) leave a signature. Storage device enumeration during attacker reconnaissance visible.</td>
+      </tr>
+      <tr>
+        <td>syslog.log <span class="tag tag-exec">system</span></td>
+        <td class="path">/var/log/syslog.log<br>/scratch/log/syslog.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>General system messages. Management service init, watchdog events, scheduled tasks, DCUI interactions.</td>
+        <td class="caveat">vmsyslogd kill events appear here immediately before the log goes silent — a strong anti-forensics indicator. Watchdog restarts of services post-tampering visible.</td>
+      </tr>
+      <tr>
+        <td>vobd.log <span class="tag tag-vm">observations</span></td>
+        <td class="path">/var/log/vobd.log<br>/scratch/log/vobd.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>VMkernel observation events. VM migration events (vMotion), storage-related observations, connectivity changes.</td>
+        <td class="caveat">Unexpected vMotion events (attacker moving VMs for staging or isolation) visible. Correlate with hostd.log and VI Events for confirmation.</td>
+      </tr>
+      <tr>
+        <td>fdm.log (HA) <span class="tag tag-net">cluster</span></td>
+        <td class="path">/var/log/fdm.log<br>/scratch/log/fdm.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>Fault Domain Manager — HA cluster events. Host failures, VM restarts, master election, heartbeat status.</td>
+        <td class="caveat">Host failure events during ransomware attack chain visible. HA master election disruption can be used to prevent VM auto-recovery. Useful for reconstructing attack sequence in multi-host incidents.</td>
+      </tr>
+      <tr>
+        <td>esxupdate.log <span class="tag tag-exec">integrity</span></td>
+        <td class="path">/scratch/log/esxupdate.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>ESXi patch and VIB (VMware Installation Bundle) install/remove events. Records every software change to the host.</td>
+        <td class="caveat">Malicious VIB installation (backdoor persistence mechanism — e.g. EvilVIB) appears here. Any CommunitySupported acceptance level VIB is suspicious. Cross-reference with <code>esxcli software vib list</code> output.</td>
+      </tr>
+      <tr>
+        <td>rhttpproxy.log <span class="tag tag-net">network</span></td>
+        <td class="path">/var/log/rhttpproxy.log</td>
+        <td class="part">Only if scratch configured</td>
+        <td>HTTP/HTTPS connections proxied to ESXi web services. All web-based management connections including NFC transfers.</td>
+        <td class="caveat">CVE exploitation against ESXi web services (e.g. CVE-2021-21985, CVE-2021-22005) leaves traces here. Source IPs of all web management connections visible.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── VM-LEVEL ARTEFACTS ────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Per-VM Artefacts (Datastore Level)</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Path</th>
+        <th>Persists reboot?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>vmware.log <span class="tag tag-vm">vm log</span></td>
+        <td class="path">/vmfs/volumes/&lt;datastore&gt;/&lt;VM name&gt;/vmware.log</td>
+        <td class="yes">Yes — on datastore</td>
+        <td>Per-VM hypervisor log. Power on/off events, snapshot creation/deletion, vMotion source/destination, guest OS tools events, hardware configuration changes, VM suspend/resume.</td>
+        <td class="caveat">Rotated as vmware-1.log, vmware-2.log etc. (configurable retention). Survives VM deletion if datastore not wiped. Records Invoke-VMScript (CVE-2023-20867 exploitation) if VMware Tools is involved.</td>
+      </tr>
+      <tr>
+        <td>VMDK flat file (.vmdk / -flat.vmdk) <span class="tag tag-vm">disk image</span></td>
+        <td class="path">/vmfs/volumes/&lt;datastore&gt;/&lt;VM name&gt;/&lt;VM&gt;-flat.vmdk</td>
+        <td class="yes">Yes — on datastore</td>
+        <td>Full virtual disk of the VM. Forensic acquisition target — treat as physical disk image. Contains the entire guest OS filesystem.</td>
+        <td class="caveat">Acquire with dd or vmkfstools on the ESXi shell, or via FTK Imager over NFS mount. No write blocker available — alter timestamps of the VMDK container file but not internal disk data. Chain of custody documentation critical.</td>
+      </tr>
+      <tr>
+        <td>VM snapshot delta (.vmdk snapshots) <span class="tag tag-vm">snapshot</span></td>
+        <td class="path">/vmfs/volumes/&lt;datastore&gt;/&lt;VM name&gt;/&lt;VM&gt;-&lt;N&gt;.vmdk</td>
+        <td class="yes">Yes — on datastore</td>
+        <td>Differential disk changes since snapshot creation. Can preserve pre-attack state of VM disk if snapshot taken before encryption. Attacker-created snapshots may contain staging data.</td>
+        <td class="caveat">Attacker-created snapshots of VMs are a known data exfiltration staging technique — snapshot, export via NFC, delete snapshot. Check vmware.log and VI Events for unexpected snapshot creation. Snapshots listed via <code>vim-cmd vmsvc/snapshot.getall &lt;vmid&gt;</code>.</td>
+      </tr>
+      <tr>
+        <td>VMX file (.vmx) <span class="tag tag-vm">config</span></td>
+        <td class="path">/vmfs/volumes/&lt;datastore&gt;/&lt;VM name&gt;/&lt;VM&gt;.vmx</td>
+        <td class="yes">Yes — on datastore</td>
+        <td>VM configuration file. Hardware config, network adapters, ISO mounts, custom parameters. Changes leave no separate audit log — the file itself is the record.</td>
+        <td class="caveat">Attacker-modified VMX parameters (e.g. disabling VMware Tools, enabling serial port for C2, or changing network adapter) are visible by comparing current state to known-good baseline. Check guestinfo parameters for covert data.</td>
+      </tr>
+      <tr>
+        <td>VM memory snapshot (.vmem / .vmsn) <span class="tag tag-vm">memory</span></td>
+        <td class="path">/vmfs/volumes/&lt;datastore&gt;/&lt;VM name&gt;/</td>
+        <td class="yes">Yes — on datastore</td>
+        <td>Memory state of a suspended or snapshotted VM. Contains full RAM content of the guest — credentials, encryption keys, network connections, running processes.</td>
+        <td class="caveat">.vmem = raw memory pages. .vmsn = snapshot state metadata. Analysable with Volatility (treat as raw memory dump). Only present if VM was suspended or snapshotted with memory included.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── COLLECTION & TRIAGE ───────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Collection Methods &amp; Triage Approach</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>What it collects</th>
+        <th>When to use</th>
+        <th>Command / tool</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ESXi support bundle <span class="tag tag-exec">collection</span></td>
+        <td>All /var/log files + running processes, services, open connections, VIB list, network config</td>
+        <td>First step on any compromised ESXi host. Captures volatile log data before reboot.</td>
+        <td class="path">vm-support (ESXi shell)<br>DFIR4vSphere: Start-ESXi_Investigation -ESXBundle</td>
+        <td class="caveat">Support bundle is a .tgz archive. If logs are already partially encrypted by ransomware, still attempt — unencrypted portions remain readable. Collect before any remediation action.</td>
+      </tr>
+      <tr>
+        <td>vCenter VI Events collection <span class="tag tag-vcenter">collection</span></td>
+        <td>All vSphere API events for a date range — structured CSV output per event type</td>
+        <td>Reconstructing the full attack timeline across all hosts managed by vCenter.</td>
+        <td class="path">DFIR4vSphere: Start-VC_Investigation -StartDate $start -EndDate $end</td>
+        <td class="caveat">Default retention 30 days but collection sometimes retrieves beyond configured window. Use -LightVIEvents flag for large environments to collect only high-value event types.</td>
+      </tr>
+      <tr>
+        <td>journalctl (VCSA systemd journal) <span class="tag tag-vcenter">collection</span><br><small style="color:#f59e0b;font-weight:600;font-size:9px;">⚠ SECONDARY — collect after VMware logs</small></td>
+        <td>OS-level service events, crashes, OOM kills, SSH sessions to the Photon OS appliance, unit start/stop — everything the VMware application logs do not capture at the OS layer</td>
+        <td>Only after vpxd.log, VI Events, and sso-events.log have been reviewed. Escalate to journal when: attacker OS-level breakout is suspected, a VMware service crashed with no app-log record, or VCSA is being forensicated as a Linux host.</td>
+        <td class="path">journalctl --no-pager &gt; /tmp/vcsa_journal.txt<br>journalctl -u vmware-vpxd --no-pager<br>journalctl -u vmware-vpostgres --no-pager<br>journalctl -u sshd --no-pager<br>journalctl --since "2024-10-01" --until "2024-10-21" --no-pager<br>journalctl -p err --no-pager</td>
+        <td class="caveat">Do not start here — vpxd.log and VI Events give better signal for typical vCenter attack scenarios (credential abuse, API calls, VM manipulation). Journal is the right next step when those logs show an unusual SSH session to the VCSA appliance itself, an unexplained vpxd crash, or evidence the attacker interacted with the Photon OS shell. Fire Ant / UNC3886 used OS-level access to the VCSA after vCenter exploitation — the journal was the primary evidence source for that post-exploitation phase. Cross-reference journal timestamps with vpxd.log and sso-events.log for a complete timeline.</td>
+      </tr>
+      <tr>
+        <td>vCenter support bundle <span class="tag tag-vcenter">collection</span></td>
+        <td>All VCSA logs including vpxd, SSO, vpostgres, and appliance OS logs</td>
+        <td>When vCenter itself is suspected to be compromised (not just managed hosts).</td>
+        <td class="path">DFIR4vSphere: Start-VC_Investigation -VCBundle<br>Or: https://&lt;vcenter&gt;:443/appliance/support-bundle</td>
+        <td class="caveat">Treat the VCSA as a Linux host for post-exploitation forensics. Standard Linux artefacts (bash_history, /etc/passwd, /var/log/auth.log) apply to the Photon OS appliance.</td>
+      </tr>
+      <tr>
+        <td>QELP — ESXi log parser <span class="tag tag-exec">analysis</span></td>
+        <td>Parses support bundle logs into timeline CSV — SSH logins, shell enable/disable, user changes, file transfers, directory traversal</td>
+        <td>Rapid triage of multiple ESXi hosts — surfaces attacker activity events quickly.</td>
+        <td class="path">QELP (Stroz Friedberg — open source CLI)</td>
+        <td class="caveat">Not all web client file access captured in syslog.log during testing. Combine with manual hostd.log and shell.log review for completeness.</td>
+      </tr>
+      <tr>
+        <td>esxcli / vim-cmd live queries <span class="tag tag-exec">live response</span></td>
+        <td>Running processes, loaded VIBs, network connections, VM inventory, snapshot list</td>
+        <td>Live host triage when the host is still running and accessible.</td>
+        <td class="path">esxcli software vib list<br>esxcli network ip connection list<br>vim-cmd vmsvc/getallvms<br>ps | grep -v grep</td>
+        <td class="caveat">VIB list is critical — any CommunitySupported or PartnerSupported VIB with an unusual name or recent install date (esxupdate.log) should be treated as suspect malicious VIB backdoor.</td>
+      </tr>
+      <tr>
+        <td>Remote syslog forwarding <span class="tag tag-net">preventive</span></td>
+        <td>All ESXi syslog output forwarded to external SIEM in real time</td>
+        <td>Only effective if configured before the incident. Survives local log wiping.</td>
+        <td class="path">esxcli system syslog config set --loghost=udp://&lt;siem&gt;:514<br>esxcli system syslog reload</td>
+        <td class="caveat">If vmsyslogd is killed by attacker, forwarding also stops — but previously forwarded logs are preserved on the SIEM. This is why remote forwarding is the single most important defensive logging configuration for ESXi.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── THREAT ACTOR TECHNIQUES ───────────────────────────── -->
+<div class="section">
+  <div class="section-label">Known Threat Actor Techniques &amp; Log Evidence</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Technique</th>
+        <th>What the attacker does</th>
+        <th>Log evidence</th>
+        <th>Residual artefacts</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Malicious VIB installation <span class="tag tag-threat">persistence</span></td>
+        <td>Installs a backdoor as a VIB (VMware Installation Bundle) on ESXi. VIBs survive reboots and can add files, services, and network listeners to the host.</td>
+        <td class="caveat">esxupdate.log: VIB install event with name, vendor, and acceptance level. Acceptance level CommunitySupported = no VMware signature validation. esxcli software vib list output collected in support bundle.</td>
+        <td class="caveat">VIB files persist in /tardisks/ and /locker/. VMware Verify_ESXi_VIB_signature.ps1 script checks signatures across all hosts. Known malicious VIBs: VIRTUALPITA, VIRTUALPIE (UNC3886 / Fire Ant).</td>
+      </tr>
+      <tr>
+        <td>vmsyslogd kill (log suppression) <span class="tag tag-threat">anti-forensics</span></td>
+        <td>Terminates the vmsyslogd daemon to stop all local log writing and remote log forwarding simultaneously.</td>
+        <td class="caveat">Last entry in syslog.log before it goes silent. Remote syslog (if configured) shows the forwarding stop. Watchdog may attempt to restart the process — restart event in syslog if it recovers.</td>
+        <td class="caveat">Unexplained log gap is itself an IOC. If remote syslog was configured, gap in remote log stream timestamps the kill event precisely. Fire Ant (UNC3886) used this technique.</td>
+      </tr>
+      <tr>
+        <td>VCDB credential extraction <span class="tag tag-threat">credential access</span></td>
+        <td>Queries the vCenter PostgreSQL database directly to extract host credentials from the vpx_host table (encrypted ESXi root passwords managed by vCenter).</td>
+        <td class="caveat">vpostgres/postgresql.log: LOG statement showing SELECT ip_address, user_name, password FROM vpx_host. vpxd.log may also show unusual database activity. Correlate with auth.log for the session that executed the query.</td>
+        <td class="caveat">Extracted credentials are AES-256 encrypted but decryptable with the vCenter symkey. Once decrypted, gives root access to all managed ESXi hosts. Document exactly which hosts' credentials were in the DB at time of breach.</td>
+      </tr>
+      <tr>
+        <td>SSH backdoor key planting <span class="tag tag-threat">persistence</span></td>
+        <td>Adds attacker-controlled SSH public key to /etc/ssh/keys-root/authorized_keys for persistent passwordless root SSH access.</td>
+        <td class="caveat">auth.log: Subsequent logins show "Accepted publickey for root" with no preceding password failure. shell.log: Commands run in the backdoor session. hostd.log if the key was planted via API.</td>
+        <td class="caveat">Authorized_keys file survives reboot only if on persistent storage. Check /etc/ssh/keys-root/authorized_keys. On default ESXi (ramdisk only) the key must be re-planted after each reboot — scheduled task or VIB used to automate.</td>
+      </tr>
+      <tr>
+        <td>VM snapshot exfiltration <span class="tag tag-threat">exfiltration</span></td>
+        <td>Creates a VM snapshot, exports the VMDK over NFC (Network File Copy), then deletes the snapshot to hide evidence.</td>
+        <td class="caveat">VI Events: vm.snapshot.create, vm.snapshot.remove in close succession. hostd.log: NFC connection establishment. vmkernel.log: NFC data transfer volume. vmware.log (per-VM): Snapshot create/delete timestamps.</td>
+        <td class="caveat">Even after snapshot deletion, the VI Events record the creation and deletion. vmware.log on the datastore preserves the events. SRUM-equivalent network telemetry on any connected Windows host may show the exfiltration volume.</td>
+      </tr>
+      <tr>
+        <td>Invoke-VMScript host-to-guest (CVE-2023-20867) <span class="tag tag-threat">lateral movement</span></td>
+        <td>Uses PowerCLI Invoke-VMScript to execute commands inside guest VMs without guest authentication, bypassing in-guest security controls.</td>
+        <td class="caveat">vmware.log (per-VM): VMware Tools guest operation events. vpxd.log: Invoke-VMScript API call logged. hostd.log: Guest operation execution event.</td>
+        <td class="caveat">Requires VMware Tools installed in guest. Exploit of CVE-2023-20867 removes the authentication requirement. Used by Fire Ant/UNC3886. Patch VMware Tools and vCenter to remediate. Guest-side: process execution from vmtoolsd.exe parent with no interactive session is IOC.</td>
+      </tr>
+      <tr>
+        <td>Mass VM power off (pre-encryption) <span class="tag tag-threat">impact</span></td>
+        <td>Powers off all VMs immediately before deploying the ESXi locker ransomware payload to ensure clean VMDK file locks for encryption.</td>
+        <td class="caveat">VI Events: Mass vm.powerOff events within seconds/minutes of each other from a single user account or API session. hostd.log: Rapid sequential power-off commands. vmkernel.log: Mass VM shutdown sequence.</td>
+        <td class="caveat">The time window between power-off events and the appearance of the ransomware locker binary on the host is often under 5 minutes. Timeline correlation between VI Events and shell.log shows the kill-then-encrypt sequence precisely.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── ANTI-FORENSICS ────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">ESXi / vCenter Anti-Forensics &amp; Log Gaps</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Technique</th>
+        <th>Detection method</th>
+        <th>Residual evidence if remote syslog configured</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>vmsyslogd killed</td>
+        <td class="caveat">Log goes silent mid-operation. Last syslog.log entry timestamps the kill. Watchdog restart attempt may appear after.</td>
+        <td class="yes">Yes — forwarded logs up to kill time preserved on SIEM</td>
+      </tr>
+      <tr>
+        <td>Local log files deleted/zeroed</td>
+        <td class="caveat">Support bundle shows empty or truncated log files. File size anomalies in /var/log. esxupdate.log may show log manipulation commands in shell history.</td>
+        <td class="yes">Yes — remote syslog preserves content</td>
+      </tr>
+      <tr>
+        <td>ESXi reboot (clears ramdisk logs)</td>
+        <td class="caveat">Reboot event visible in vmkernel.log (before reboot). VI Events record the host reboot time. vCenter shows host reconnection event in vpxd.log.</td>
+        <td class="yes">Yes — all pre-reboot logs preserved remotely</td>
+      </tr>
+      <tr>
+        <td>Shell access disabled after use</td>
+        <td class="caveat">shell.log records both enable and disable events with timestamps. The gap between enable and disable = attacker active window.</td>
+        <td class="yes">Yes</td>
+      </tr>
+      <tr>
+        <td>VIB backdoor installed then removed</td>
+        <td class="caveat">esxupdate.log records both install and remove. VI Events may show the host maintenance operations. Removed VIBs leave no file-system trace but log trace persists.</td>
+        <td class="yes">Yes — if esxupdate events forwarded</td>
+      </tr>
+      <tr>
+        <td>VCDB tampered / records deleted</td>
+        <td class="caveat">vpostgres log shows DELETE or UPDATE statements outside normal vCenter operations. vpxd.log shows vCenter service restarts that may indicate DB manipulation.</td>
+        <td class="part">Partial — DB query logs forwarded but DB state itself not</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── KEY IOCs ──────────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">High-Value IOC Patterns to Hunt</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>IOC pattern</th>
+        <th>Log source</th>
+        <th>What it indicates</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>SSH login from unexpected IP, no prior failures</td><td class="path">auth.log</td><td class="caveat">Pre-planted SSH key — existing backdoor access. No brute force needed.</td></tr>
+      <tr><td>ESXi shell enabled outside change window</td><td class="path">shell.log / syslog.log</td><td class="caveat">Interactive attacker session about to begin or in progress.</td></tr>
+      <tr><td>esxcli software vib install / CommunitySupported VIB</td><td class="path">esxupdate.log / shell.log</td><td class="caveat">Malicious VIB backdoor installation — persistence mechanism.</td></tr>
+      <tr><td>SELECT * FROM vpx_host in postgres log</td><td class="path">vpostgres/postgresql.log</td><td class="caveat">VCDB credential extraction — attacker harvesting all managed host passwords.</td></tr>
+      <tr><td>Mass vm.powerOff in VI Events within &lt;60 seconds</td><td class="path">VI Events / hostd.log</td><td class="caveat">Pre-encryption VM kill — ransomware deployment imminent or underway.</td></tr>
+      <tr><td>Unexpected snapshot create+delete on same VM within minutes</td><td class="path">VI Events / vmware.log</td><td class="caveat">Snapshot-based VMDK exfiltration — data theft via NFC.</td></tr>
+      <tr><td>NFC connection to external IP</td><td class="path">vmkernel.log / rhttpproxy.log</td><td class="caveat">VMDK or data transfer to attacker-controlled infrastructure.</td></tr>
+      <tr><td>vCenter login from new geolocation or unusual hour</td><td class="path">vpxd.log / sso-events.log</td><td class="caveat">Compromised vCenter credentials — first access or lateral movement.</td></tr>
+      <tr><td>Invoke-VMScript on multiple VMs in rapid succession</td><td class="path">vpxd.log / vmware.log (per-VM)</td><td class="caveat">Host-to-guest lateral movement — potentially CVE-2023-20867 exploitation.</td></tr>
+      <tr><td>Log file gap — timestamp jump with no graceful shutdown</td><td class="path">Any ESXi log</td><td class="caveat">vmsyslogd killed or logs manually deleted — active anti-forensics.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<footer>vCenter / ESXi Forensics Log &amp; Artefact Value Matrix &mdash; Peli Rufus &mdash; April 2026 &mdash; Sources: Broadcom KB, ANSSI DFIR4vSphere, Synacktiv Velociraptor ESXi research, Stroz Friedberg QELP, Sygnia Fire Ant/UNC3886 report, Ekoparty 2024 VMware forensics talk</footer>
+
+</body>
+</html>

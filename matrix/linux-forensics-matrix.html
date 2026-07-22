@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux OS — Forensics Log & Artefact Value Matrix</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; padding: 2rem; font-size: 13px; line-height: 1.5; }
+  h1 { font-size: 20px; font-weight: 600; color: #f8fafc; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 2rem; }
+  .arch-note { font-size: 11px; color: #475569; background: #161b27; border: 1px solid #1e293b; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 2rem; line-height: 1.7; }
+  .arch-note strong { color: #94a3b8; }
+  .arch-note code { font-family: 'Courier New', monospace; font-size: 10.5px; color: #7dd3fc; background: #0d1520; padding: 1px 4px; border-radius: 3px; }
+  .section { margin-bottom: 2.5rem; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #475569; margin-bottom: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid #1e293b; }
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #1e293b; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  thead tr { background: #161b27; }
+  thead th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; white-space: nowrap; border-bottom: 1px solid #1e293b; }
+  tbody tr { border-bottom: 1px solid #1a2030; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #141923; }
+  td { padding: 9px 12px; vertical-align: top; color: #cbd5e1; font-size: 12px; }
+  td:first-child { font-weight: 600; color: #e2e8f0; min-width: 190px; }
+  td.path { font-family: 'Courier New', monospace; font-size: 10.5px; color: #7dd3fc; min-width: 220px; }
+  td.caveat { color: #64748b; font-size: 11px; max-width: 360px; }
+  .yes  { color: #4ade80; font-weight: 600; }
+  .no   { color: #f87171; font-weight: 600; }
+  .part { color: #fbbf24; font-weight: 600; }
+  .tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+  .tag-auth    { background: #1e3a5f; color: #60a5fa; }
+  .tag-exec    { background: #14361f; color: #4ade80; }
+  .tag-persist { background: #3b2000; color: #fbbf24; }
+  .tag-net     { background: #1a2d1a; color: #86efac; }
+  .tag-threat  { background: #3b1a1a; color: #fca5a5; }
+  .tag-fs      { background: #2a1f3d; color: #a78bfa; }
+  .legend { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #64748b; }
+  .dot-yes  { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .dot-no   { width: 8px; height: 8px; border-radius: 50%; background: #f87171; }
+  .dot-part { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+  footer { font-size: 11px; color: #334155; margin-top: 2rem; border-top: 1px solid #1e293b; padding-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>Linux OS — Forensics Log &amp; Artefact Value Matrix</h1>
+<p class="subtitle">Quick-reference for incident response and forensic investigation of Linux systems.</p>
+
+<div class="arch-note">
+  <strong>Key notes:</strong> Log paths vary by distribution — Debian/Ubuntu uses <code>/var/log/auth.log</code> and <code>/var/log/syslog</code>; RHEL/CentOS/Rocky uses <code>/var/log/secure</code> and <code>/var/log/messages</code>. On systemd-based systems, the primary log store is the <strong>systemd journal</strong> (<code>journalctl</code>) which may be the only source if rsyslog is not installed. Shell history files are per-user and easily deleted — their <em>absence</em> on an active system is itself suspicious. On a compromised system with a rootkit present, <strong>standard system tools (ps, ls, ss, lsof) cannot be trusted</strong> — use statically compiled or trusted binaries from read-only media. Collection tool: <strong>UAC</strong> (Unix-like Artifact Collector, tclahr/uac). Memory acquisition: <strong>LiME</strong> (Loadable Kernel Module).
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot-yes"></div> Strong / Yes</div>
+  <div class="legend-item"><div class="dot-part"></div> Partial / Conditional</div>
+  <div class="legend-item"><div class="dot-no"></div> No / Not reliable</div>
+</div>
+
+<!-- ── AUTHENTICATION & SESSION LOGS ─────────────────────── -->
+<div class="section">
+  <div class="section-label">Authentication &amp; Session Logs</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path (Debian / RHEL)</th><th>Persists reboot?</th><th>Has timestamps?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>auth.log / secure <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/auth.log (Debian)<br>/var/log/secure (RHEL)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes — per event</td>
+        <td>All SSH logins (success and failure), sudo usage, PAM events, su switches, cron authentication. Primary authentication audit source. Source IP visible on SSH events.</td>
+        <td class="caveat">Rotated — check auth.log.1, auth.log.2.gz for older events. SSH brute force leaves high-volume failure entries before a success. Sudo usage shows exact commands with user context.</td>
+      </tr>
+      <tr>
+        <td>wtmp <span class="tag tag-auth">session</span></td>
+        <td class="path">/var/log/wtmp</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Login/logout timestamps</td>
+        <td>Binary record of every login session — user, terminal, source IP, login time, logout time. Read with <code>last</code> command. Provides session duration.</td>
+        <td class="caveat">Binary format — do not cat directly. Parse with <code>last -f /var/log/wtmp</code>. Can be modified or zeroed by attacker — absence of expected sessions is an IOC.</td>
+      </tr>
+      <tr>
+        <td>btmp <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/btmp</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Binary log of all failed login attempts. Read with <code>lastb</code>. Shows brute force attempts including targeted usernames and source IPs.</td>
+        <td class="caveat">Binary format — parse with <code>lastb -f /var/log/btmp</code>. Often rotated as btmp.1. High entry count from single IP = brute force campaign.</td>
+      </tr>
+      <tr>
+        <td>lastlog <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/lastlog</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Last login per user</td>
+        <td>Records the last login time and source for every user account on the system. Read with <code>lastlog</code>. Quickly shows dormant accounts that suddenly became active.</td>
+        <td class="caveat">Binary sparse file indexed by UID — one entry per user. Never-logged-in accounts show as **Never logged in**. Backdoor account that suddenly shows a login is a strong IOC.</td>
+      </tr>
+      <tr>
+        <td>utmp (live sessions) <span class="tag tag-auth">session</span></td>
+        <td class="path">/var/run/utmp</td>
+        <td class="no">No — volatile</td>
+        <td class="yes">Yes</td>
+        <td>Currently logged-in users at time of collection. Read with <code>who</code> or <code>w</code>. Shows active terminals and source IPs.</td>
+        <td class="caveat">Volatile — only useful on a live system. Lost after reboot. On a compromised system, rootkits can hide sessions from utmp while keeping them active.</td>
+      </tr>
+      <tr>
+        <td>faillog <span class="tag tag-auth">auth</span></td>
+        <td class="path">/var/log/faillog</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Failed login counts per user with timestamps. Accounts with high failure counts followed by a success indicate successful brute force.</td>
+        <td class="caveat">Binary format — parse with <code>faillog</code> command. Not present on all distributions.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── SYSTEM & KERNEL LOGS ──────────────────────────────── -->
+<div class="section">
+  <div class="section-label">System &amp; Kernel Logs</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path</th><th>Persists reboot?</th><th>Has timestamps?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>syslog / messages <span class="tag tag-exec">system</span></td>
+        <td class="path">/var/log/syslog (Debian)<br>/var/log/messages (RHEL)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>General system messages from kernel and services. Service start/stop events, cron job execution records (cron logs here on many distros), network configuration changes, hardware events.</td>
+        <td class="caveat">Cron job executions logged here by default — shows what ran and when. Service crash/restart events useful for detecting killed security tools. Rotated — check syslog.1 and compressed archives.</td>
+      </tr>
+      <tr>
+        <td>kern.log / dmesg <span class="tag tag-exec">kernel</span></td>
+        <td class="path">/var/log/kern.log<br>/var/log/dmesg<br>dmesg command (live ring buffer)</td>
+        <td class="part">kern.log yes, dmesg volatile</td>
+        <td class="yes">Yes</td>
+        <td>Kernel messages — module load/unload events, hardware events, network driver activity. LKM (Loadable Kernel Module) rootkit insertion leaves a trace here. OOM killer events indicate memory pressure.</td>
+        <td class="caveat">Kernel module insertion (insmod/modprobe) logged here. Suspicious module name or path = LKM rootkit indicator. dmesg ring buffer is volatile — collect immediately on live response. Rootkits may suppress kernel messages.</td>
+      </tr>
+      <tr>
+        <td>systemd journal <span class="tag tag-exec">system</span></td>
+        <td class="path">/var/log/journal/ (persistent)<br>/run/log/journal/ (volatile)</td>
+        <td class="part">Only if Storage=persistent in journald.conf</td>
+        <td class="yes">Yes — microsecond precision</td>
+        <td>On systemd systems, the journal is the primary log for all services, units, and kernel messages. Binary format — query with <code>journalctl</code>. Captures stdout/stderr of every service unit. Harder to partially tamper than text logs.</td>
+        <td class="caveat">Binary format — cannot be tampered with a text editor. Collect with <code>journalctl --no-pager > journal.txt</code> or copy the binary journal files. Persistence must be explicitly enabled — default is volatile on many distros.</td>
+      </tr>
+      <tr>
+        <td>audit.log (auditd) <span class="tag tag-exec">audit</span></td>
+        <td class="path">/var/log/audit/audit.log</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes — epoch timestamps</td>
+        <td>If auditd is configured, this is the highest-fidelity log on Linux. Captures syscalls, file access, process execution, network connections, user/group changes, and privilege escalation — all with user context (UID/AUID). AUID (audit UID) survives su/sudo and tracks the original login session.</td>
+        <td class="caveat">Only as useful as the audit rules configured. Default rules are minimal. AUID (loginuid) is the key field — traces activity back to the original SSH session even after sudo. Parse with <code>ausearch</code> and <code>aureport</code>. aureport -au for authentication, aureport -x for executions.</td>
+      </tr>
+      <tr>
+        <td>boot.log <span class="tag tag-exec">system</span></td>
+        <td class="path">/var/log/boot.log</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Service start/stop events during system boot. Records which services were enabled and their startup status. Useful for confirming whether persistence mechanisms executed at boot.</td>
+        <td class="caveat">Not present on all distributions. Systemd-based systems may rely on the journal for boot-time service events instead.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── SHELL HISTORY & USER ACTIVITY ─────────────────────── -->
+<div class="section">
+  <div class="section-label">Shell History &amp; User Activity</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path</th><th>Persists reboot?</th><th>Has timestamps?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>bash_history <span class="tag tag-exec">execution</span></td>
+        <td class="path">~/.bash_history<br>/root/.bash_history</td>
+        <td class="yes">Yes</td>
+        <td class="no">No (unless HISTTIMEFORMAT set)</td>
+        <td>Commands typed by the user in bash. Most forensically valuable user activity artefact on Linux. Reveals attacker tooling, download commands, lateral movement, and privilege escalation attempts.</td>
+        <td class="caveat">Easily deleted or cleared with <code>history -c</code> or <code>unset HISTFILE</code>. Absence on an active system is suspicious. HISTTIMEFORMAT env var adds timestamps — check if set. Commands prefixed with a space may be excluded (HISTCONTROL=ignorespace). Check all user home dirs including /root.</td>
+      </tr>
+      <tr>
+        <td>zsh_history / fish_history <span class="tag tag-exec">execution</span></td>
+        <td class="path">~/.zsh_history<br>~/.local/share/fish/fish_history</td>
+        <td class="yes">Yes</td>
+        <td class="part">zsh: optional, fish: yes</td>
+        <td>Equivalent of bash_history for zsh and fish shells. zsh_history can include timestamps if extended_history is set. fish_history includes timestamps by default.</td>
+        <td class="caveat">Check which shell each user account uses — <code>/etc/passwd</code> lists the default shell. Attackers may switch shells specifically to avoid bash history logging.</td>
+      </tr>
+      <tr>
+        <td>.viminfo / .lesshst <span class="tag tag-exec">user activity</span></td>
+        <td class="path">~/.viminfo<br>~/.lesshst</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>.viminfo records files recently opened in vim, recent search patterns, and yanked content — can reveal config files the attacker edited. .lesshst shows files paged with less.</td>
+        <td class="caveat">Frequently overlooked. Can reveal exactly which files were viewed or edited even when bash_history is cleared.</td>
+      </tr>
+      <tr>
+        <td>recently used files (.recently-used.xbel) <span class="tag tag-exec">user activity</span></td>
+        <td class="path">~/.local/share/recently-used.xbel</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>GTK recently used files list — files opened by GUI applications. XML format. Reveals documents, scripts, or archives opened via file manager or GUI apps.</td>
+        <td class="caveat">Only present on systems with a desktop environment. Not relevant for headless servers.</td>
+      </tr>
+      <tr>
+        <td>sudo log entries <span class="tag tag-auth">privilege</span></td>
+        <td class="path">/var/log/auth.log or /var/log/secure</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Every sudo command with the invoking user, the target user (usually root), the working directory, and the exact command run. Provides full privilege escalation audit trail.</td>
+        <td class="caveat">grep -i sudo /var/log/auth.log to extract quickly. sudo commands with env_reset bypassed (NOPASSWD entries in /etc/sudoers) are a persistence/privilege escalation indicator.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── FILE SYSTEM & INODE ARTEFACTS ─────────────────────── -->
+<div class="section">
+  <div class="section-label">File System &amp; Inode Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path / Command</th><th>Survives deletion?</th><th>Timestamps available?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Inode timestamps (mtime / ctime / atime) <span class="tag tag-fs">filesystem</span></td>
+        <td class="path">stat &lt;file&gt;<br>find / -newer /tmp/ref_file</td>
+        <td class="yes">Until block reuse</td>
+        <td class="yes">mtime / ctime / atime</td>
+        <td>mtime = last content modification. ctime = last metadata change (cannot be set back by normal tools — useful for detecting touch -t tampering). atime = last access (often disabled for performance). ctime is the closest Linux equivalent to a tamper-detection timestamp.</td>
+        <td class="caveat">atime is often mounted with noatime or relatime — do not rely on it. ctime cannot be set by users but is updated on permission/owner changes. Unlike Windows, Linux has no creation time (birthtime) on most filesystems — ext4 stores it in crtime but tools rarely expose it.</td>
+      </tr>
+      <tr>
+        <td>ext4 filesystem journal <span class="tag tag-fs">filesystem</span></td>
+        <td class="path">debugfs -R 'logdump -a' /dev/sdX<br>extundelete</td>
+        <td class="yes">Short window</td>
+        <td class="yes">Partial</td>
+        <td>Records recent metadata transactions — file creation, rename, deletion. Can recover recently deleted files and reveal file names that have been unlinked. Equivalent to Windows $LogFile.</td>
+        <td class="caveat">Journal wraps quickly on busy systems. Must work on offline/unmounted filesystem for accuracy. Tool: extundelete, debugfs. SSD TRIM may prevent recovery.</td>
+      </tr>
+      <tr>
+        <td>find — recently modified files <span class="tag tag-fs">filesystem</span></td>
+        <td class="path">find / -mtime -1 -type f 2>/dev/null<br>find /tmp /var/tmp /dev/shm -type f</td>
+        <td class="yes">Until deletion</td>
+        <td class="yes">Yes</td>
+        <td>Quickly surfaces recently created or modified files. Focuses on attacker staging directories (/tmp, /var/tmp, /dev/shm). New files in /etc, /usr/bin, /lib are high suspicion.</td>
+        <td class="caveat">/dev/shm is a memory-backed tmpfs — files here never touch disk and are lost on reboot. Attacker payloads stored here leave no filesystem artefact after reboot. Collect immediately.</td>
+      </tr>
+      <tr>
+        <td>SUID / SGID binaries <span class="tag tag-fs">privilege</span></td>
+        <td class="path">find / -perm -4000 -type f 2>/dev/null<br>find / -perm -2000 -type f 2>/dev/null</td>
+        <td class="yes">Yes</td>
+        <td class="yes">ctime reflects when SUID was set</td>
+        <td>New SUID binaries are a classic privilege escalation and persistence mechanism. An attacker with root who sets /bin/bash -p SUID creates a persistent root shell. Compare against known-good SUID list.</td>
+        <td class="caveat">Baseline comparison is essential. All legitimate SUID binaries are well-known — any unexpected path (especially /tmp, /home, /var) is malicious. ctime of the binary will show when the SUID bit was set.</td>
+      </tr>
+      <tr>
+        <td>Hidden files and dot-directories <span class="tag tag-fs">filesystem</span></td>
+        <td class="path">ls -la /tmp /var/tmp /dev/shm /home/*<br>find / -name ".*" -type f 2>/dev/null</td>
+        <td class="yes">Until deletion</td>
+        <td class="yes">Yes</td>
+        <td>Attacker tools and staging data frequently hidden with leading dot in filename or placed in world-writable directories. Double-dot directories (.. with space) are a common obfuscation technique.</td>
+        <td class="caveat">Check /tmp, /var/tmp, /dev/shm, /var/www, and all user home directories. Files named with spaces or unusual Unicode are anti-forensics indicators.</td>
+      </tr>
+      <tr>
+        <td>Deleted but open file descriptors <span class="tag tag-fs">filesystem</span></td>
+        <td class="path">ls -la /proc/*/fd | grep deleted<br>lsof | grep deleted</td>
+        <td class="no">Lost on reboot</td>
+        <td class="yes">Via /proc</td>
+        <td>Files deleted from the filesystem but still held open by a running process remain accessible via /proc/PID/fd/. Common technique — malware deletes its own binary after execution to hide it from disk scans, but content readable via /proc.</td>
+        <td class="caveat">Volatile — only on live system. Content retrievable with <code>cp /proc/PID/fd/N /tmp/recovered_binary</code>. This is a first-priority live response action before any process is killed.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── PROCESS & MEMORY ARTEFACTS ────────────────────────── -->
+<div class="section">
+  <div class="section-label">Process &amp; Memory Artefacts (Live Response)</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Source</th><th>Volatile?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>/proc filesystem <span class="tag tag-exec">execution</span></td>
+        <td class="path">/proc/&lt;PID&gt;/cmdline<br>/proc/&lt;PID&gt;/exe<br>/proc/&lt;PID&gt;/maps<br>/proc/&lt;PID&gt;/environ<br>/proc/&lt;PID&gt;/net/tcp</td>
+        <td class="yes">Yes — volatile</td>
+        <td>cmdline = full command line including arguments. exe = symlink to the binary on disk (check if pointing to deleted file). maps = memory mapped regions including injected libraries. environ = environment variables including LD_PRELOAD. net/tcp = network connections per process.</td>
+        <td class="caveat">All /proc entries are volatile and disappear when the process ends or system reboots. Collect all of /proc for key PIDs immediately. exe pointing to a path marked (deleted) = binary was running from a file that has since been removed — recover via fd.</td>
+      </tr>
+      <tr>
+        <td>Process list anomalies <span class="tag tag-exec">execution</span></td>
+        <td class="path">ps aufwx<br>pspy64 (unprivileged process monitor)</td>
+        <td class="yes">Volatile</td>
+        <td>Unexpected processes, processes with misleading names (kworker, systemd-X), processes running from /tmp or /dev/shm, processes with no controlling terminal (detached backdoors).</td>
+        <td class="caveat">On a rootkit-compromised system, ps output cannot be trusted — rootkit hooks hide processes. Use pspy64 (unprivileged, reads /proc directly) or compare /proc directory listing against ps output. Discrepancy = hidden process (rootkit present).</td>
+      </tr>
+      <tr>
+        <td>Network connections <span class="tag tag-net">network</span></td>
+        <td class="path">ss -tunlp<br>netstat -tulpn<br>/proc/net/tcp /proc/net/tcp6</td>
+        <td class="yes">Volatile</td>
+        <td>Active network connections with associated PIDs and listening ports. Unexpected outbound connections to unusual IPs = C2 beaconing. Unexpected listening ports = bind shell or backdoor listener.</td>
+        <td class="caveat">ss/netstat can be hidden by rootkits — cross-reference with /proc/net/tcp (harder to hide). Compare listening ports against expected service baseline. Connections to loopback on unusual ports indicate local inter-process C2 (e.g. reverse proxy).</td>
+      </tr>
+      <tr>
+        <td>Memory dump (LiME) <span class="tag tag-exec">memory</span></td>
+        <td class="path">insmod lime.ko "path=/mnt/evidence/mem.lime format=lime"</td>
+        <td class="yes">Volatile</td>
+        <td>Full RAM acquisition. Enables Volatility3 analysis — process listing, network connections, kernel module enumeration, string searching. The only reliable source when rootkit hides data from OS tools.</td>
+        <td class="caveat">LiME is a kernel module — insertion modifies the running system slightly. Must be compiled for the exact kernel version of the target. Tool: LiME (Volatility compatible). Analyse with Volatility3 linux plugins: linux.pslist, linux.netstat, linux.lsmod, linux.bash.</td>
+      </tr>
+      <tr>
+        <td>Loaded kernel modules <span class="tag tag-exec">kernel</span></td>
+        <td class="path">lsmod<br>/proc/modules<br>/proc/kallsyms<br>/sys/module/</td>
+        <td class="yes">Volatile</td>
+        <td>List of loaded kernel modules. LKM rootkits load as kernel modules and may hide from lsmod. Compare lsmod output against /proc/modules listing — discrepancy = hidden LKM rootkit.</td>
+        <td class="caveat">LKM rootkits use list_del() to remove themselves from the module linked list shown by lsmod, but traces may remain in /proc/kallsyms (exported symbols) and kern.log (load event). Tools: unhide, Tracee (eBPF-based).</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── USER & ACCOUNT ARTEFACTS ─────────────────────────── -->
+<div class="section">
+  <div class="section-label">User &amp; Account Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path</th><th>Persists reboot?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>/etc/passwd <span class="tag tag-auth">accounts</span></td>
+        <td class="path">/etc/passwd</td>
+        <td class="yes">Yes</td>
+        <td>All user accounts — username, UID, GID, home directory, default shell. UID 0 accounts beyond root = backdoor account. Accounts with /bin/bash shell but no legitimate purpose = suspicious. Accounts with UID matching a legitimate account but different name = collision attack.</td>
+        <td class="caveat">World-readable. Check for non-standard UID 0 entries (multiple root-equivalent accounts). Accounts with home directories in /tmp or /dev are strong IOCs. Compare against a known-good baseline.</td>
+      </tr>
+      <tr>
+        <td>/etc/shadow <span class="tag tag-auth">accounts</span></td>
+        <td class="path">/etc/shadow</td>
+        <td class="yes">Yes</td>
+        <td>Password hashes, password age, expiry. Recently changed password hashes = attacker may have set a new password. Accounts with no password (empty hash field) = unauthenticated access possible.</td>
+        <td class="caveat">Root-readable only. Hash format prefix identifies the algorithm: $1$=MD5 (weak), $5$=SHA-256, $6$=SHA-512, $y$=yescrypt (modern). Offline cracking with hashcat on extracted hashes.</td>
+      </tr>
+      <tr>
+        <td>/etc/sudoers and sudoers.d <span class="tag tag-auth">privilege</span></td>
+        <td class="path">/etc/sudoers<br>/etc/sudoers.d/*</td>
+        <td class="yes">Yes</td>
+        <td>Defines who can run what commands as root. NOPASSWD entries for ALL commands = root access without password. Unexpected user entries = privilege escalation persistence.</td>
+        <td class="caveat">Attacker often drops a file in /etc/sudoers.d/ rather than editing the main sudoers file — easier to hide. Check both locations. visudo validates syntax — direct file edits may leave invalid entries.</td>
+      </tr>
+      <tr>
+        <td>SSH authorized_keys <span class="tag tag-auth">persistence</span></td>
+        <td class="path">~/.ssh/authorized_keys<br>/root/.ssh/authorized_keys</td>
+        <td class="yes">Yes</td>
+        <td>Public keys authorised for passwordless SSH login. Attacker-planted key provides persistent backdoor access without any log entry showing a password attempt.</td>
+        <td class="caveat">Check for all users with SSH access. Look for unusual key comments (email fields) or keys with unusual options (command= restriction, no-pty). Immutable attribute (chattr +i) used by advanced attackers to prevent removal — check with lsattr.</td>
+      </tr>
+      <tr>
+        <td>/etc/ssh/sshd_config modifications <span class="tag tag-auth">persistence</span></td>
+        <td class="path">/etc/ssh/sshd_config</td>
+        <td class="yes">Yes</td>
+        <td>SSH daemon configuration. PermitRootLogin yes = direct root SSH enabled. PasswordAuthentication yes = brute force possible. AuthorizedKeysFile pointing to an unusual path = backdoor key loading mechanism.</td>
+        <td class="caveat">ctime of the file shows when it was last changed. Compare against distro default or known baseline. Attackers frequently enable PermitRootLogin to ensure persistent access after planting a root SSH key.</td>
+      </tr>
+      <tr>
+        <td>/etc/group <span class="tag tag-auth">accounts</span></td>
+        <td class="path">/etc/group</td>
+        <td class="yes">Yes</td>
+        <td>Group memberships. Unexpected addition of a user to the sudo, wheel, or docker group = privilege escalation. Docker group membership = effective root (docker escape).</td>
+        <td class="caveat">docker group = root equivalent on most systems. Any non-administrative user in sudo/wheel/docker should be investigated. Cross-reference with auth.log for when the change was made.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── PERSISTENCE MECHANISMS ────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Persistence Mechanisms</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Mechanism</th><th>Locations to check</th><th>Root required?</th><th>Survives reboot?</th><th>Detection method</th><th>MITRE ATT&amp;CK</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Cron jobs <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/crontab<br>/etc/cron.d/*<br>/etc/cron.daily/hourly/weekly/monthly/*<br>/var/spool/cron/crontabs/&lt;user&gt;</td>
+        <td class="no">No — user cron without root</td>
+        <td class="yes">Yes</td>
+        <td>Check all cron locations for unexpected entries or scripts. Compare script content against expected — appended malicious lines within legitimate cron scripts are common. ctime of cron files shows when modified.</td>
+        <td class="caveat">T1053.003. Cron execution logged in syslog/messages. New cron file creation detectable via auditd file watch on /etc/cron.d/. pspy64 shows cron execution in real time without root.</td>
+      </tr>
+      <tr>
+        <td>Systemd service units <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/systemd/system/*.service<br>/lib/systemd/system/*.service<br>/run/systemd/system/*.service<br>~/.config/systemd/user/*.service</td>
+        <td class="part">System = yes, User = no</td>
+        <td class="yes">Yes</td>
+        <td>New .service files or modified ExecStart paths in existing units. User-level units (~/.config/systemd/user/) require no root. systemctl list-units --type=service shows enabled services. ctime on unit files shows modification time.</td>
+        <td class="caveat">T1543.002. systemd timers (.timer units) are also abused — check alongside services. journalctl -u &lt;service&gt; shows unit execution history. New service with ExecStart pointing to /tmp or /dev/shm is a strong IOC.</td>
+      </tr>
+      <tr>
+        <td>Shell init file modification <span class="tag tag-persist">persistence</span></td>
+        <td class="path">~/.bashrc / ~/.bash_profile / ~/.profile<br>~/.zshrc<br>/etc/profile<br>/etc/profile.d/*<br>/etc/bash.bashrc</td>
+        <td class="part">System-wide = yes, user = no</td>
+        <td class="yes">Yes</td>
+        <td>Look for appended lines at the bottom of shell init files — attackers typically append rather than overwrite. Reverse shell one-liners, export LD_PRELOAD=, or curl|bash patterns are strong IOCs. ctime of the file shows when modified.</td>
+        <td class="caveat">T1546.004. User-level files require no root — any user can establish persistence via their own .bashrc. /etc/profile.d/*.sh files execute for all users at login — a single file here gives system-wide persistence.</td>
+      </tr>
+      <tr>
+        <td>LD_PRELOAD / dynamic linker hijack <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/ld.so.preload<br>/etc/ld.so.conf<br>LD_PRELOAD env var in shell init files</td>
+        <td class="part">ld.so.preload = yes, env var = no</td>
+        <td class="yes">Yes</td>
+        <td>/etc/ld.so.preload not set by default — any entry is suspicious. Check with ldd &lt;binary&gt; to see injected libraries. Cross-reference /proc/&lt;PID&gt;/maps for unexpected .so files loaded into processes. Malware: HiddenWasp, Symbiote, Azazel all use this technique.</td>
+        <td class="caveat">T1574.006. LKM rootkits may protect /etc/ld.so.preload from modification or viewing — standard cat will return empty even when the file has content. Use statically compiled tools or memory forensics. Cannot be detected if rootkit is actively hiding it.</td>
+      </tr>
+      <tr>
+        <td>LKM (Loadable Kernel Module) rootkit <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/lib/modules/$(uname -r)/kernel/<br>/proc/modules<br>/proc/kallsyms<br>lsmod vs /proc/modules comparison</td>
+        <td class="yes">Yes (if loaded at boot)</td>
+        <td class="yes">Yes</td>
+        <td>Discrepancy between lsmod output and /proc/modules content = hidden module. Unexpected symbols in /proc/kallsyms. kern.log shows module load event. Tool: unhide, Tracee (eBPF). Module loaded from unusual path (not /lib/modules/) is strong IOC.</td>
+        <td class="caveat">Most dangerous persistence — operates at kernel level, can hide all evidence. Standard tools completely unreliable once LKM rootkit is active. Trusted analysis requires booting from read-only media or memory forensics. Known rootkits: Diamorphine, Reptile, Reptile2.</td>
+      </tr>
+      <tr>
+        <td>SysV init / rc.local <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/init.d/*<br>/etc/rc.local<br>/etc/rc*.d/</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>rc.local executes at boot. init.d scripts define services. Malicious content appended to rc.local or new init.d scripts. File ctime shows modification time.</td>
+        <td class="caveat">T1037.004. Common on older systems and some distros (Debian still supports rc.local). systemd systems may emulate rc.local via rc-local.service — still executes. Check file content and ctime.</td>
+      </tr>
+      <tr>
+        <td>MOTD (Message of the Day) scripts <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/update-motd.d/*<br>/etc/motd</td>
+        <td class="no">No — root required</td>
+        <td class="yes">Yes</td>
+        <td>update-motd.d scripts execute as root on every SSH login. Malicious script here runs with root privileges every time any user logs in via SSH. Rarely audited.</td>
+        <td class="caveat">Not present on RHEL derivatives. Particularly effective because it executes on every SSH session including automated ones. Any executable in /etc/update-motd.d/ that does more than display text is suspicious.</td>
+      </tr>
+      <tr>
+        <td>udev rules <span class="tag tag-persist">persistence</span></td>
+        <td class="path">/etc/udev/rules.d/*<br>/lib/udev/rules.d/*<br>/run/udev/rules.d/*</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>udev rules trigger on hardware events. Malicious rule executes a payload when any device is connected or on network interface changes. Rarely monitored. Used by Sedexp malware.</td>
+        <td class="caveat">T1546 (uncategorised subtechnique). Rarely seen in the wild — highly suspicious if any rule contains RUN+= pointing to a non-standard binary. udevadm monitor on live system shows rule triggers.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── NETWORK ARTEFACTS ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Network Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Path / Command</th><th>Volatile?</th><th>Key forensic value</th><th>Caveats</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>SSH known_hosts <span class="tag tag-net">network</span></td>
+        <td class="path">~/.ssh/known_hosts<br>/etc/ssh/ssh_known_hosts</td>
+        <td class="yes">Persistent</td>
+        <td>Fingerprints of SSH servers the user has previously connected to. Reveals lateral movement targets — hosts the attacker connected to from this machine. Each entry proves an outbound SSH connection was made.</td>
+        <td class="caveat">Per-user. Host entries added at first connection. Attacker may use StrictHostKeyChecking=no to avoid adding entries (check bash_history for this flag). Global known_hosts in /etc/ssh/ shows system-wide connections.</td>
+      </tr>
+      <tr>
+        <td>resolv.conf modifications <span class="tag tag-net">network</span></td>
+        <td class="path">/etc/resolv.conf</td>
+        <td class="yes">Persistent</td>
+        <td>DNS server configuration. Attacker may change to rogue DNS to facilitate C2 resolution. Adding 8.8.8.8 to bypass internal DNS is a common attacker action to reach external C2.</td>
+        <td class="caveat">ctime shows when modified. On systemd-resolved systems, this may be a symlink — check the actual configuration file. Modification of /etc/hosts to add attacker-controlled IP mappings is a related technique.</td>
+      </tr>
+      <tr>
+        <td>/etc/hosts modifications <span class="tag tag-net">network</span></td>
+        <td class="path">/etc/hosts</td>
+        <td class="yes">Persistent</td>
+        <td>Static DNS overrides. Attacker may add entries to redirect legitimate domains to attacker infrastructure (C2 domain pointing to internal IP) or to reach C2 hosts by name without DNS.</td>
+        <td class="caveat">Compare against known-good baseline. Any entry pointing to an external IP for an internal domain name, or vice versa, is suspicious.</td>
+      </tr>
+      <tr>
+        <td>iptables / nftables rules <span class="tag tag-net">network</span></td>
+        <td class="path">iptables -L -n -v<br>nft list ruleset<br>/etc/iptables/rules.v4</td>
+        <td class="part">Persistent if saved</td>
+        <td>Active firewall rules. Attacker may add rules to allow inbound connections to backdoor ports, or to block outbound connections from security tools. New ACCEPT rules for unusual ports are IOCs.</td>
+        <td class="caveat">Unsaved rules (memory only) are lost on reboot. Check both current rules (iptables -L) and saved rules files (/etc/iptables/). New INPUT ACCEPT rules added without corresponding service = backdoor port.</td>
+      </tr>
+      <tr>
+        <td>Apache / nginx access and error logs <span class="tag tag-net">web</span></td>
+        <td class="path">/var/log/apache2/access.log<br>/var/log/nginx/access.log<br>/var/log/httpd/access_log (RHEL)</td>
+        <td class="yes">Persistent</td>
+        <td>Web server access logs. Webshell access, exploitation attempts (path traversal, LFI, RCE CVEs), C2 communication via HTTP. Source IPs, user agents, request paths, response codes.</td>
+        <td class="caveat">Webshell requests often show unusual paths (e.g. /images/shell.php), unusual User-Agent strings, or POST requests to static files. 200 response to a non-existent path = webshell. Correlate with file creation timestamps in the web root.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── ANTI-FORENSICS & IOC PATTERNS ─────────────────────── -->
+<div class="section">
+  <div class="section-label">Anti-Forensics Indicators &amp; High-Value IOC Patterns</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>IOC / Technique</th><th>Detection method</th><th>Log / artefact source</th><th>Notes</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>bash_history cleared or absent on active system</td><td class="caveat">Check file size — truncated to 0 bytes. Check HISTFILE unset in /proc/PID/environ. Check for <code>history -c</code> in the history itself.</td><td class="path">~/.bash_history<br>/proc/&lt;PID&gt;/environ</td><td class="caveat">Absence is an IOC. Attacker may have set HISTSIZE=0 or HISTFILESIZE=0 in shell init files to disable logging going forward.</td></tr>
+      <tr><td>Process running from /tmp, /var/tmp, or /dev/shm</td><td class="caveat">check /proc/*/cmdline and /proc/*/exe for paths in world-writable directories. pspy64 shows execution in real time.</td><td class="path">/proc/&lt;PID&gt;/exe<br>pspy64 output</td><td class="caveat">/dev/shm is memory-backed — payload never touches disk. Execution from these paths is almost never legitimate.</td></tr>
+      <tr><td>Process with exe symlink pointing to (deleted) file</td><td class="caveat">ls -la /proc/*/exe | grep deleted</td><td class="path">/proc/&lt;PID&gt;/exe</td><td class="caveat">Binary deleted after launch to hide from disk scans. Recover content via /proc/PID/fd/ immediately — lost on process end or reboot.</td></tr>
+      <tr><td>New UID 0 account in /etc/passwd</td><td class="caveat">awk -F: '$3==0' /etc/passwd — shows all root-equivalent accounts</td><td class="path">/etc/passwd</td><td class="caveat">Only root should have UID 0. Any additional UID 0 account = backdoor. Check ctime of /etc/passwd for modification time.</td></tr>
+      <tr><td>SSH key added to root authorized_keys</td><td class="caveat">cat /root/.ssh/authorized_keys — compare against known keys. lsattr to check immutable flag.</td><td class="path">/root/.ssh/authorized_keys<br>auth.log (subsequent logins)</td><td class="caveat">Root SSH key = permanent backdoor. Subsequent logins appear as legitimate key-based auth with no password failure in auth.log.</td></tr>
+      <tr><td>New or modified SUID binary in unexpected path</td><td class="caveat">find / -perm -4000 -newer /etc/passwd — finds SUID files newer than passwd last change</td><td class="path">Filesystem</td><td class="caveat">ctime of binary shows when SUID bit was set. Any SUID binary outside /usr/bin, /usr/sbin, /bin, /sbin is suspicious.</td></tr>
+      <tr><td>/etc/ld.so.preload populated</td><td class="caveat">cat /etc/ld.so.preload — should be empty or non-existent by default</td><td class="path">/etc/ld.so.preload</td><td class="caveat">Any content = injected shared library. All dynamically linked binaries on the system will load this library. Rootkit may protect the file from being read — use memory forensics or trusted static binaries.</td></tr>
+      <tr><td>lsmod vs /proc/modules discrepancy</td><td class="caveat">diff &lt;(lsmod | awk '{print $1}' | sort) &lt;(cat /proc/modules | awk '{print $1}' | sort)</td><td class="path">/proc/modules<br>lsmod</td><td class="caveat">LKM rootkit hides itself from lsmod by removing its entry from the kernel module list. Any module in /proc/modules not in lsmod = active LKM rootkit. Requires memory forensics to fully analyse.</td></tr>
+      <tr><td>NOPASSWD ALL in sudoers for unexpected user</td><td class="caveat">grep -r NOPASSWD /etc/sudoers /etc/sudoers.d/</td><td class="path">/etc/sudoers<br>/etc/sudoers.d/*</td><td class="caveat">Grants passwordless root access. Attacker commonly drops a file in /etc/sudoers.d/ with one line: username ALL=(ALL) NOPASSWD: ALL</td></tr>
+      <tr><td>Webshell — POST request to static file extension</td><td class="caveat">grep "POST.*\.(jpg|png|gif|ico|css|js)" /var/log/apache2/access.log</td><td class="path">/var/log/apache2/access.log<br>/var/log/nginx/access.log</td><td class="caveat">POST requests to files that should be static = webshell communication. Correlate with file creation time in web root for exact drop time.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── COLLECTION TOOLS ──────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Collection Tools &amp; Triage Approach</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Tool</th><th>What it collects</th><th>When to use</th><th>Notes</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>UAC (Unix-like Artifact Collector)</td>
+        <td>473+ Linux artefacts — logs, process info, network state, user accounts, cron, systemd units, SSH keys, shell history, /proc, open files, kernel modules</td>
+        <td>First step on any suspected Linux compromise. Single portable shell script — no installation required.</td>
+        <td class="caveat">Uses target system binaries by default — if rootkit is present, results may be unreliable. Include statically compiled trusted binaries via UAC's /bin directory override for rootkit scenarios. Output is a collection of text files importable into Cyber Triage.</td>
+      </tr>
+      <tr>
+        <td>LiME (Linux Memory Extractor)</td>
+        <td>Full physical memory acquisition to file or network socket</td>
+        <td>When memory forensics is needed — fileless malware, rootkit analysis, credential extraction from RAM.</td>
+        <td class="caveat">Kernel module — must be compiled for exact target kernel version (uname -r). Minimal memory footprint during acquisition. Output analysable with Volatility3 linux plugins.</td>
+      </tr>
+      <tr>
+        <td>pspy64</td>
+        <td>Real-time process monitoring without root — reads /proc directly</td>
+        <td>Live response when you need to watch for cron/systemd executions or spot processes a rootkit may be hiding from ps.</td>
+        <td class="caveat">Unprivileged — does not require root. Shows new process creation events including those hidden from ps. Useful for confirming cron job execution timing.</td>
+      </tr>
+      <tr>
+        <td>unhide</td>
+        <td>Finds processes and ports hidden by rootkits by comparing multiple data sources</td>
+        <td>When LKM rootkit is suspected — compare ps, /proc, syscall enumeration, and brute-force PID scanning.</td>
+        <td class="caveat">May itself be hooked by a sufficiently advanced rootkit. Best run from read-only media with statically compiled binary. unhide sys for process hiding, unhide tcp for port hiding.</td>
+      </tr>
+      <tr>
+        <td>Volatility3 (linux plugins)</td>
+        <td>Process list, network connections, kernel modules, bash history from memory, environment variables, kernel symbol hooks</td>
+        <td>After LiME memory acquisition. Essential for rootkit analysis and fileless malware investigation.</td>
+        <td class="caveat">Key plugins: linux.pslist, linux.netstat, linux.lsmod, linux.bash, linux.malfind, linux.check_syscall (detect syscall hooking). Requires a matching kernel symbol file (ISF profile) for the target kernel version.</td>
+      </tr>
+      <tr>
+        <td>auditd + ausearch / aureport</td>
+        <td>Syscall-level audit — file access, process execution, network, privilege changes (if configured)</td>
+        <td>When auditd is running on the target. Highest fidelity source if audit rules cover the relevant activity.</td>
+        <td class="caveat">aureport -au for auth events, -x for executable events, -f for file access. ausearch -k &lt;key&gt; for specific rule matches. AUID field traces events back to original SSH session even after sudo. Not present by default on all distros.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<footer>Linux OS Forensics Log &amp; Artefact Value Matrix &mdash; Peli Rufus &mdash; April 2026 &mdash; Sources: Elastic Security Labs Linux persistence research, Sandfly rootkit analysis, PANIX persistence tool (Aegrah), UAC (tclahr), Splunk Linux detection engineering, DFIR-Notes</footer>
+
+</body>
+</html>

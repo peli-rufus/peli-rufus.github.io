@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows Forensics — Artefact Value Matrix</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    padding: 2rem;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #f8fafc;
+    margin-bottom: 0.25rem;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 2.5rem;
+  }
+
+  .section {
+    margin-bottom: 2.5rem;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #475569;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 700px;
+  }
+
+  thead tr {
+    background: #161b27;
+  }
+
+  thead th {
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #475569;
+    white-space: nowrap;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid #1a2030;
+    transition: background 0.1s;
+  }
+
+  tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  tbody tr:hover {
+    background: #141923;
+  }
+
+  td {
+    padding: 9px 12px;
+    vertical-align: middle;
+    color: #cbd5e1;
+    font-size: 12px;
+  }
+
+  td:first-child {
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    min-width: 160px;
+  }
+
+  td.caveat {
+    color: #64748b;
+    font-size: 11px;
+    max-width: 320px;
+  }
+
+  .yes  { color: #4ade80; font-weight: 600; }
+  .no   { color: #f87171; font-weight: 600; }
+  .part { color: #fbbf24; font-weight: 600; }
+
+  .tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag-exec     { background: #1e3a5f; color: #60a5fa; }
+  .tag-presence { background: #14361f; color: #4ade80; }
+  .tag-persist  { background: #3b2000; color: #fbbf24; }
+  .tag-network  { background: #2a1f3d; color: #a78bfa; }
+
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #64748b;
+  }
+  .dot-yes  { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .dot-no   { width: 8px; height: 8px; border-radius: 50%; background: #f87171; }
+  .dot-part { width: 8px; height: 8px; border-radius: 50%; background: #fbbf24; }
+</style>
+</head>
+<body>
+
+<h1>Windows Forensics — Artefact Value Matrix</h1>
+<p class="subtitle">Quick-reference guide for investigative decision-making. Each row answers: what can this artefact prove, and what are its limits?</p>
+
+<div class="legend">
+  <div class="legend-item"><div class="dot-yes"></div> Strong / Yes</div>
+  <div class="legend-item"><div class="dot-part"></div> Partial / Conditional</div>
+  <div class="legend-item"><div class="dot-no"></div> No</div>
+</div>
+
+<!-- ── EVIDENCE OF EXECUTION ─────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Evidence of Execution</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves execution?</th>
+        <th>Proves presence?</th>
+        <th>Survives deletion?</th>
+        <th>Timestamps</th>
+        <th>Run count?</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Prefetch (.pf) <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Last 8 run times</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Disabled on Server OS by default. Only last 8 timestamps stored. Enable via registry if needed.</td>
+      </tr>
+      <tr>
+        <td>UserAssist <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Strong (GUI only)</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td>Last run time</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">CLI executions not recorded here. Values are ROT13 encoded — Registry Explorer decodes automatically.</td>
+      </tr>
+      <tr>
+        <td>ShimCache <span class="tag tag-presence">presence</span></td>
+        <td class="no">Not alone</td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td>Last modified time</td>
+        <td class="no">No</td>
+        <td class="caveat">Presence ≠ execution. Executed flag is NA on Win10+. Must correlate with Prefetch or BAM to claim execution.</td>
+      </tr>
+      <tr>
+        <td>AmCache.hve <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>First run + install time</td>
+        <td class="no">No</td>
+        <td class="caveat">SHA1 hash available for IOC matching. Schema differs between Win8.1 (Root\File) and Win10/11 (Root\InventoryApplicationFile).</td>
+      </tr>
+      <tr>
+        <td>BAM / DAM <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>Last execution time</td>
+        <td class="no">No</td>
+        <td class="caveat">Per-SID entries — good for attribution. Resets on some Windows updates. Covers background and foreground processes.</td>
+      </tr>
+      <tr>
+        <td>Windows 10 Timeline <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>Focus time</td>
+        <td class="no">No</td>
+        <td class="caveat">SQLite ActivitiesCache.db. Removed/limited in Win11. May sync across devices if MS account is linked.</td>
+      </tr>
+      <tr>
+        <td>PcaAppLaunchDic.txt <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>Yes — per entry</td>
+        <td class="no">No</td>
+        <td class="caveat">Windows 11 22H2+ only. Pipe-delimited path|timestamp format. Not yet parsed by most forensic tools.</td>
+      </tr>
+      <tr>
+        <td>IconCacheDB <span class="tag tag-presence">presence</span></td>
+        <td class="no">Not alone</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td>No</td>
+        <td class="no">No</td>
+        <td class="caveat">Written at shutdown/reboot only — not real-time. Proves binary was present after Explorer browsing. Correlate with Prefetch + AmCache.</td>
+      </tr>
+      <tr>
+        <td>MUICache <span class="tag tag-exec">execution</span></td>
+        <td class="part">Partial — Explorer-launched only</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td class="no">No timestamps</td>
+        <td class="no">No</td>
+        <td class="caveat">Explorer-launched binaries only — does not capture cmd/PS/service execution. No per-entry timestamps. Entry survives binary deletion. Blank or <code>@</code> PE description = no resource section (suspicious). Vista+: <code>HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache</code> in <code>UsrClass.dat</code>. XP: <code>HKCU\Software\Microsoft\Windows\ShellNoRoam\MUICache</code> in <code>NTUSER.DAT</code>. Tools: Registry Explorer, RegRipper (<code>rip.pl -r UsrClass.dat -p muicache</code>), KAPE Target: <code>RegistryHives</code>.</td>
+      </tr>
+      <tr>
+        <td>RecentApps (AppLaunched / AppSwitched) <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes — AppLaunched proves execution</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes — LastAccessTime per app</td>
+        <td class="yes">Yes — LaunchCount per app</td>
+        <td class="no">No</td>
+        <td class="caveat">Windows 10+ only — not on Server OS or Win7/8. Stored in <code>NTUSER.DAT</code>. AppLaunched = executed via shell, survives deletion. AppSwitched = user actively interacted (Alt-Tab/taskbar) — AppLaunched with no AppSwitched = automated/background execution (service, scheduled task, C2). Path: <code>HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\RecentApps</code>. Tools: Registry Explorer, RegRipper (<code>rip.pl -r NTUSER.DAT -p recentapps</code>), KAPE Target: <code>RegistryHives</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── FILE & FOLDER ACTIVITY ────────────────────────────── -->
+<div class="section">
+  <div class="section-label">File &amp; Folder Activity</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves file access?</th>
+        <th>Survives deletion?</th>
+        <th>Timestamps</th>
+        <th>Full path?</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>LNK files <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td>Created + accessed</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Contains volume serial — links file to specific physical drive. Auto-created by Explorer only, not CLI access.</td>
+      </tr>
+      <tr>
+        <td>Jump Lists <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td>Yes</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Per-application via AppID. AutoDest + CustomDest. Records network share paths — useful for lateral movement cases.</td>
+      </tr>
+      <tr>
+        <td>RecentDocs (registry) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>Last opened</td>
+        <td class="no">Filename only</td>
+        <td class="caveat">Extension-specific subkeys. MRU ordered. Does not store full path — correlate with LNK files for full path.</td>
+      </tr>
+      <tr>
+        <td>ShellBags <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Folder browsing</td>
+        <td class="yes">Yes</td>
+        <td>First + last interacted</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Survives folder deletion. Records network share and external drive access. Primary source is USRCLASS.DAT.</td>
+      </tr>
+      <tr>
+        <td>Office MRU <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td>Yes</td>
+        <td class="yes">Full path</td>
+        <td class="caveat">Version-specific registry path. O365 uses LiveID subkey path. Separate from Windows RecentDocs.</td>
+      </tr>
+      <tr>
+        <td>WordWheelQuery <span class="tag tag-presence">presence</span></td>
+        <td class="no">Search terms only</td>
+        <td class="part">Partial</td>
+        <td>Key LastWrite only</td>
+        <td class="no">No</td>
+        <td class="caveat">Binary encoded. Reveals what the user was searching for — high value in insider threat and data theft cases.</td>
+      </tr>
+      <tr>
+        <td>IE/Edge WebCache <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Local files too</td>
+        <td class="part">Partial</td>
+        <td>Yes</td>
+        <td class="yes">Yes (file:/// prefix)</td>
+        <td class="caveat">Records locally opened files, not just web history. file:/// entries indicate local file access. Parse with Autopsy.</td>
+      </tr>
+      <tr>
+        <td>ComDlg32 (CIDSizeMRU · LastVisitedPidlMRU · OpenSavePidlMRU) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Open/save dialog activity</td>
+        <td class="part">Partial</td>
+        <td>Key LastWrite · MRU order</td>
+        <td class="yes">Full path (OpenSave)</td>
+        <td class="caveat">CIDSizeMRU = recently launched apps globally. LastVisitedPidlMRU = executable + last directory used per app. OpenSavePidlMRU = full paths of files opened/saved per extension. Does not prove execution — proves file interaction via dialog box. Registry path: NTUSER.DAT\Software\Microsoft\Windows\CurrentVersion\Explorer\ComDlg32.</td>
+      </tr>
+      <tr>
+        <td>Recycle Bin ($I / $R) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Deletion evidence</td>
+        <td class="yes">Until emptied</td>
+        <td>Deletion timestamp</td>
+        <td class="yes">Original full path</td>
+        <td class="caveat">SID subfolder identifies which user deleted the file. $I = metadata, $R = file content. Tool: RBCmd.exe.</td>
+      </tr>
+      <tr>
+        <td>Windows.edb (Search Index) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">File existence</td>
+        <td class="yes">Yes</td>
+        <td>Indexed timestamp</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Proves a file existed and was indexed even if subsequently deleted. ESE database. Tools: esedatabaseview, sidr.exe.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── NTFS ARTEFACTS ─────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">NTFS Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves presence?</th>
+        <th>Survives deletion?</th>
+        <th>Timestamps</th>
+        <th>Detects tampering?</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>$MFT <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Strong</td>
+        <td class="yes">Until overwritten</td>
+        <td>MACB — two full sets</td>
+        <td class="yes">SI vs FN comparison</td>
+        <td class="caveat">Every file/directory has an MFT entry. Deleted entries persist until the slot is reused. Tool: MFTECmd.exe.</td>
+      </tr>
+      <tr>
+        <td>$STANDARD_INFORMATION timestamps (SI)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">In MFT</td>
+        <td>MACB (what Explorer shows)</td>
+        <td class="no">Easily stomped</td>
+        <td class="caveat">Can be modified by any user with timestomping tools. Do not rely on SI timestamps alone in adversarial cases.</td>
+      </tr>
+      <tr>
+        <td>$FILE_NAME timestamps (FN)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">In MFT</td>
+        <td>MACB (in MFT only)</td>
+        <td class="yes">Kernel access required to modify</td>
+        <td class="caveat">SI vs FN mismatch = strong timestomping indicator. Not visible in Explorer — requires MFTECmd.exe to extract.</td>
+      </tr>
+      <tr>
+        <td>$UsnJrnl ($J stream) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Yes</td>
+        <td class="part">Wraps ~72 hrs</td>
+        <td>Per-operation timestamp</td>
+        <td class="part">Rename detection</td>
+        <td class="caveat">Records every create/rename/delete/modify operation. Best source for rename and deletion evidence. Tool: MFTECmd.exe -f $J.</td>
+      </tr>
+      <tr>
+        <td>$LogFile <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Recent ops</td>
+        <td class="no">Very short window</td>
+        <td>Transaction log entries</td>
+        <td class="part">Partial</td>
+        <td class="caveat">NTFS transaction log — very short retention. Useful for immediate post-incident recovery of recent file system changes.</td>
+      </tr>
+      <tr>
+        <td>Alternate Data Streams (ADS) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Hidden data</td>
+        <td class="part">Partial</td>
+        <td>Yes</td>
+        <td class="part">Partial</td>
+        <td class="caveat">Zone.Identifier stream proves internet origin (Mark of the Web). Attackers hide payloads in ADS. Tools: streams.exe, MFTECmd.</td>
+      </tr>
+      <tr>
+        <td>$I30 (Directory Index) <span class="tag tag-presence">presence</span></td>
+        <td class="yes">Deleted filenames</td>
+        <td class="yes">Until index page reuse</td>
+        <td>FN timestamps per entry</td>
+        <td class="yes">Yes — with FN timestamps</td>
+        <td class="caveat">B-tree index of directory entries. Slack space in unallocated index pages retains deleted file names, sizes, and $FILE_NAME timestamps even after MFT record reallocation and $UsnJrnl rollover. Key uses: (1) recover names of deleted attacker tools from staging directories, (2) detect timestomping — $I30 FN timestamps are harder to modify than SI timestamps; SI/FN mismatch = stomping. Each entry contains all four FN timestamps (crtime, mtime, atime, ctime) + filename + file size + MFT reference. Path: <code>$I30</code> named stream on any directory MFT record ($INDEX_ROOT 0x90 + $INDEX_ALLOCATION 0xA0). Tools: MFTECmd (<code>MFTECmd.exe -f "$MFT" --csv . --csvf mft.csv</code>), INDXParse.py, icat (TSK: <code>icat image.dd &lt;inode&gt;-144-4 &gt; i30.bin</code>), KAPE Target: <code>MFT</code>. Vol3: <code>windows.mftscan.MFTScan</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── USB & EXTERNAL DEVICES ────────────────────────────── -->
+<div class="section">
+  <div class="section-label">USB &amp; External Devices</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves connection?</th>
+        <th>Survives removal?</th>
+        <th>Timestamps</th>
+        <th>Identifies device?</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>USBSTOR (registry)</td>
+        <td class="yes">Strong</td>
+        <td class="yes">Yes</td>
+        <td>First connect + last connect + last removal</td>
+        <td class="yes">Vendor / product / serial</td>
+        <td class="caveat">Timestamps via {83da6326} property key subvalues 0064/0066/0067. Mass storage class devices only.</td>
+      </tr>
+      <tr>
+        <td>USB (registry)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Plug-in time</td>
+        <td class="yes">VID / PID</td>
+        <td class="caveat">All USB device classes — keyboards, cameras, dongles, not just storage. Broader scope than USBSTOR.</td>
+      </tr>
+      <tr>
+        <td>MountedDevices (registry)</td>
+        <td class="yes">Drive letter mapping</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td class="yes">Volume signature</td>
+        <td class="caveat">Links drive letters (e.g. E:) to device signatures. Essential for reconstructing exfiltration path and correlating LNK volume serials.</td>
+      </tr>
+      <tr>
+        <td>MountPoints2 (NTUSER.DAT)</td>
+        <td class="yes">User attribution</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td class="yes">Yes</td>
+        <td class="caveat">Per-user registry key — proves which user account interacted with the device. Critical for attribution in insider threat cases.</td>
+      </tr>
+      <tr>
+        <td>Setupapi.dev.log</td>
+        <td class="yes">First connection</td>
+        <td class="yes">Yes</td>
+        <td>First seen timestamp</td>
+        <td class="yes">Device ID + serial</td>
+        <td class="caveat">Text log at C:\Windows\inf\. Shows device ID and serial number on first attachment. Not updated on subsequent connections.</td>
+      </tr>
+      <tr>
+        <td>LNK / shortcut files</td>
+        <td class="part">Indirect</td>
+        <td class="yes">Yes</td>
+        <td>File access time</td>
+        <td class="yes">Volume serial number</td>
+        <td class="caveat">Contains volume serial of the source drive. Cross-reference with MountedDevices to confirm which physical device a file came from.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── NETWORK & BROWSER ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Network &amp; Browser</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves network activity?</th>
+        <th>Retention</th>
+        <th>Timestamps</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SRUM (SRUDB.dat) <span class="tag tag-network">network</span></td>
+        <td class="yes">Strong</td>
+        <td>30–60 days</td>
+        <td>Daily buckets</td>
+        <td>Bytes sent/received per process per day. Quantifies data volume for exfiltration investigations.</td>
+        <td class="caveat">Locked on live system — collect with KAPE. ESE database requiring esentutl recovery if dirty.</td>
+      </tr>
+      <tr>
+        <td>NetworkList (registry) <span class="tag tag-network">network</span></td>
+        <td class="yes">Yes</td>
+        <td>Persistent</td>
+        <td>First + last connected</td>
+        <td>Every network ever connected — SSID, GUID, managed vs unmanaged (domain vs public).</td>
+        <td class="caveat">Key LastWrite = last connection time. Managed = domain-joined network. Unmanaged = public/home.</td>
+      </tr>
+      <tr>
+        <td>tsclient MRU (registry) <span class="tag tag-network">network</span></td>
+        <td class="yes">RDP history</td>
+        <td>Persistent</td>
+        <td>Key LastWrite</td>
+        <td>RDP target hostnames/IPs. UsernameHint for account attribution. CertHash for endpoint verification.</td>
+        <td class="caveat">Client-side only. Combine with Event ID 1149 (TerminalServices log) for server-side confirmation.</td>
+      </tr>
+      <tr>
+        <td>RDP Bitmap Cache <span class="tag tag-network">network</span></td>
+        <td class="yes">Session content</td>
+        <td>Persistent</td>
+        <td class="no">No</td>
+        <td>Partial screenshots of remote desktop sessions — can reveal attacker activity on the remote host.</td>
+        <td class="caveat">Binary tile format. Reconstruction is partial. Location: %LOCALAPPDATA%\Microsoft\Terminal Server Client\Cache\. Tool: bmc-tools.</td>
+      </tr>
+      <tr>
+        <td>PuTTY SshHostKeys <span class="tag tag-network">network</span></td>
+        <td class="yes">SSH history</td>
+        <td>Persistent</td>
+        <td>Key LastWrite</td>
+        <td>Fingerprints of SSH servers connected to. FileZilla shares this same cache.</td>
+        <td class="caveat">NTUSER.DAT hive — per-user. Software\SimonTatham\PuTTY\SshHostKeys.</td>
+      </tr>
+      <tr>
+        <td>Browser History <span class="tag tag-network">network</span></td>
+        <td class="yes">Web activity</td>
+        <td>Until cleared</td>
+        <td>Visit timestamps</td>
+        <td>URLs, visit count, typed vs clicked. Identify phishing URLs, C2 panels, staged payloads.</td>
+        <td class="caveat">Firefox: places.sqlite. Chrome/Edge: History (SQLite). Timestamps in WebKit format for Chrome. Tool: Hindsight.</td>
+      </tr>
+      <tr>
+        <td>Browser Downloads <span class="tag tag-network">network</span></td>
+        <td class="yes">File origin</td>
+        <td>Until cleared</td>
+        <td>Download time</td>
+        <td>Source URL + local save path. Correlate with Prefetch for evidence of execution post-download.</td>
+        <td class="caveat">Chrome/Edge: downloads table in History SQLite. Firefox: moz_annos table in places.sqlite.</td>
+      </tr>
+      <tr>
+        <td>CryptnetUrlCache <span class="tag tag-network">network</span></td>
+        <td class="yes">Crypto/cert URLs</td>
+        <td>Persistent</td>
+        <td>Yes</td>
+        <td>URLs contacted for cert validation or payload staging. certutil abuse leaves entries here.</td>
+        <td class="caveat">Per-user profile at %APPDATA%\LocalLow\Microsoft\CryptnetUrlCache\. certutil in execution artefacts + entries here = high-confidence IOC.</td>
+      </tr>
+      <tr>
+        <td>Windows Firewall Log <span class="tag tag-network">network</span></td>
+        <td class="yes">Connection attempts</td>
+        <td>Limited (log rotation)</td>
+        <td>Per-packet timestamp</td>
+        <td>ALLOW/DROP per connection with source/dest IP and port. Inbound lateral movement detection.</td>
+        <td class="caveat">Logging disabled by default in some configs. Location: System32\LogFiles\Firewall\pfirewall.log.</td>
+      </tr>
+      <tr>
+        <td>SUM Database <span class="tag tag-network">network</span></td>
+        <td class="yes">Client access</td>
+        <td>2-year rolling window</td>
+        <td>InsertDate + LastAccess</td>
+        <td>Which clients/accounts connected to which server services — SMB, RDP, IIS, AD DS. Maps lateral movement.</td>
+        <td class="caveat">Windows Server 2012+ only. ESE database at System32\LogFiles\SUM\. Requires esentutl recovery if dirty. Tool: SumECmd.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── PERSISTENCE MECHANISMS ────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Persistence Mechanisms</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Admin required?</th>
+        <th>Survives reboot?</th>
+        <th>Timestamps</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Run / RunOnce keys <span class="tag tag-persist">persistence</span></td>
+        <td class="part">HKLM = yes · HKCU = no</td>
+        <td class="yes">Yes</td>
+        <td>Key LastWrite</td>
+        <td>Simplest persistence mechanism. HKCU Run writable without admin rights — very common malware location.</td>
+        <td class="caveat">RunOnce deletes the entry after first execution — may be gone by collection time. Check RegBack hive backups.</td>
+      </tr>
+      <tr>
+        <td>Services (registry) <span class="tag tag-persist">persistence</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Key LastWrite</td>
+        <td>ImagePath = executable. ServiceDll = actual DLL for svchost-hosted services. Start value reveals boot behaviour.</td>
+        <td class="caveat">For shared-process services: check Parameters\ServiceDll — ImagePath just shows svchost.exe. Start 0x00/0x01 = kernel driver level.</td>
+      </tr>
+      <tr>
+        <td>Scheduled Tasks (XML + registry) <span class="tag tag-persist">persistence</span></td>
+        <td class="part">Depends on principal</td>
+        <td class="yes">Yes</td>
+        <td>Creation + last run</td>
+        <td>XML survives registry cleaning. Registry TaskCache survives XML deletion. Always check both locations.</td>
+        <td class="caveat">Event IDs 106/140/141/200/201 (TaskScheduler log) and 4698/4699/4702 (Security log) for creation/deletion timeline.</td>
+      </tr>
+      <tr>
+        <td>Winlogon hijacking <span class="tag tag-persist">persistence</span></td>
+        <td class="part">HKLM = yes · HKCU = no</td>
+        <td class="yes">Yes</td>
+        <td>Key LastWrite</td>
+        <td>Userinit and Shell values run for every user at logon. HKCU version requires no admin rights.</td>
+        <td class="caveat">Default Userinit = userinit.exe, (trailing comma is normal). Any addition after the comma is malicious.</td>
+      </tr>
+      <tr>
+        <td>IFEO (Debugger hijacking) <span class="tag tag-persist">persistence</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Key LastWrite</td>
+        <td>Replaces any named process with attacker binary. Accessibility binaries (sethc.exe, osk.exe) enable logon-screen backdoor.</td>
+        <td class="caveat">Image File Execution Options. Common targets: sethc.exe, osk.exe, magnify.exe, utilman.exe — all launchable from locked screen.</td>
+      </tr>
+      <tr>
+        <td>Startup folders <span class="tag tag-persist">persistence</span></td>
+        <td class="part">AllUsers = yes · per-user = no</td>
+        <td class="yes">Yes</td>
+        <td>File creation time</td>
+        <td>Simplest technique — any file type dropped here executes at logon. No registry knowledge required.</td>
+        <td class="caveat">Per-user: AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup. AllUsers: ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp.</td>
+      </tr>
+      <tr>
+        <td>WMI Subscriptions <span class="tag tag-persist">persistence</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td class="no">No timestamps</td>
+        <td>Fileless persistence — survives registry and file system cleaning. Three components: EventFilter + EventConsumer + FilterToConsumerBinding.</td>
+        <td class="caveat">Stored in WMI repository (System32\wbem\Repository\), not registry. Tool: PyWMIPersistenceFinder, Velociraptor VQL artifact Windows.Persistence.PermanentWMIEvents.</td>
+      </tr>
+      <tr>
+        <td>AppInit_DLLs <span class="tag tag-persist">persistence</span></td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>Key LastWrite</td>
+        <td>DLLs loaded into every process that loads user32.dll — very broad injection surface.</td>
+        <td class="caveat">Deprecated/blocked with Secure Boot on Win8+. Still present on legacy or misconfigured systems. High signal if populated.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── SYSTEM INFORMATION & ACCOUNTS ─────────────────────── -->
+<div class="section">
+  <div class="section-label">System Information &amp; Accounts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Source hive</th>
+        <th>Registry path</th>
+        <th>Forensic value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OS Version</td>
+        <td>SOFTWARE</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">Microsoft\Windows NT\CurrentVersion</td>
+        <td class="caveat">Establishes OS build — critical for selecting correct artefact paths and interpreting schema differences (e.g. AmCache, Prefetch).</td>
+      </tr>
+      <tr>
+        <td>Computer Name</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">CurrentControlSet\Control\ComputerName\ComputerName</td>
+        <td class="caveat">Confirms you are analysing the correct machine. First step in any investigation.</td>
+      </tr>
+      <tr>
+        <td>Time Zone</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">CurrentControlSet\Control\TimeZoneInformation</td>
+        <td class="caveat">Essential for timeline normalisation — some artefacts use local time, others UTC. Must establish before building any timeline.</td>
+      </tr>
+      <tr>
+        <td>CurrentControlSet</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">Select\Current</td>
+        <td class="caveat">Identifies which ControlSet (001 or 002) was active at boot. Must resolve this before querying offline hives — CurrentControlSet only exists on live systems.</td>
+      </tr>
+      <tr>
+        <td>Network Interfaces</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">CurrentControlSet\Services\Tcpip\Parameters\Interfaces</td>
+        <td class="caveat">IP config, DHCP, DNS per interface. Confirms machine identity and network context.</td>
+      </tr>
+      <tr>
+        <td>SAM — User Accounts</td>
+        <td>SAM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">Domains\Account\Users</td>
+        <td class="caveat">Username, RID, login count, last login, last failed login, last password change, group membership. Requires SYSTEM hive for hash decryption.</td>
+      </tr>
+      <tr>
+        <td>ProfileList</td>
+        <td>SOFTWARE</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">Microsoft\Windows NT\CurrentVersion\ProfileList</td>
+        <td class="caveat">Maps SIDs to usernames and profile paths. Essential for attributing per-user artefacts (NTUSER.DAT, USRCLASS.DAT) to account names.</td>
+      </tr>
+      <tr>
+        <td>LanmanServer Shares</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">CurrentControlSet\Services\LanmanServer\Shares</td>
+        <td class="caveat">Active network share names hosted by this machine. Useful for understanding what data was exposed and accessible over the network.</td>
+      </tr>
+      <tr>
+        <td>MountPoints2</td>
+        <td>NTUSER.DAT</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">Software\Microsoft\Windows\CurrentVersion\Explorer\MountPoints2</td>
+        <td class="caveat">Per-user evidence of USB device and network share access. Attribution artefact — proves which user account interacted with an external resource.</td>
+      </tr>
+      <tr>
+        <td>Firewall Rules</td>
+        <td>SYSTEM</td>
+        <td style="font-family: monospace; font-size: 11px; color: #94a3b8;">ControlSet001\Services\SharedAccess\Parameters\FirewallPolicy\FirewallRules</td>
+        <td class="caveat">Active firewall rules. Attacker-added allow rules for C2 ports are a high-fidelity indicator of compromise.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── EMAIL ARTEFACTS ───────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Email Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves email activity?</th>
+        <th>Survives deletion?</th>
+        <th>Timestamps</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OST file (Outlook)</td>
+        <td class="yes">Strong</td>
+        <td class="yes">Until wiped</td>
+        <td>ClientSubmitTime · DeliveryTime · CreationTime</td>
+        <td>Full mailbox — Inbox, Sent, Drafts, Deleted Items, BCC recipient lists.</td>
+        <td class="caveat">Cannot open directly in Outlook. Tools: pff-tools (Linux), XstReader (Windows). Convert to PST for Outlook import.</td>
+      </tr>
+      <tr>
+        <td>PST file (Outlook)</td>
+        <td class="yes">Strong</td>
+        <td class="yes">Until wiped</td>
+        <td>Full timestamps</td>
+        <td>Portable archive. Importable directly into Outlook. May contain older archived evidence not in OST.</td>
+        <td class="caveat">Associated with POP3 accounts or manual archiving. Check for PST files outside default Outlook directory.</td>
+      </tr>
+      <tr>
+        <td>InternetHeaders.txt (pff-tools export)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Until wiped</td>
+        <td>Date + full delivery chain</td>
+        <td>Sender IP, SPF/DKIM/DMARC results, routing hops. Walk Received headers bottom-to-top to find originating IP.</td>
+        <td class="caveat">X-Originating-IP, X-Mailer, Authentication-Results fields are highest forensic value. Phishing origin tracing.</td>
+      </tr>
+      <tr>
+        <td>Message.html (pff-tools export)</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Until wiped</td>
+        <td class="no">No</td>
+        <td>HTML body — extract href attributes for malicious URLs. Attachment names and embedded links visible.</td>
+        <td class="caveat">Check all a href attributes. Attachment names in XstReader Content panel. Cross-reference URL against threat intel.</td>
+      </tr>
+      <tr>
+        <td>Thunderbird MBOX</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Until wiped</td>
+        <td>Yes</td>
+        <td>Plaintext format — grep-friendly for large-scale keyword or IOC searching without tools.</td>
+        <td class="caveat">Use mboxgrep for CLI searching or import into Thunderbird. Headers and body fully readable as plain text.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── MEMORY ARTEFACTS ───────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Memory Artefacts (Disk-Resident)</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Contains memory content?</th>
+        <th>Survives reboot?</th>
+        <th>Analysable with Volatility?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>hiberfil.sys</td>
+        <td class="yes">Full RAM snapshot</td>
+        <td class="yes">Yes — until next hibernate</td>
+        <td class="yes">Yes — after conversion</td>
+        <td>Complete RAM image from last hibernation. Contains processes, network connections, credentials, encryption keys, and decrypted strings from malware. Best disk-resident memory source.</td>
+        <td class="caveat">Compressed — must convert with Volatility's imagecopy or hibernate2dmp before analysis. Location: C:\hiberfil.sys. Only present if hibernation is enabled.</td>
+      </tr>
+      <tr>
+        <td>pagefile.sys</td>
+        <td class="part">Memory fragments only</td>
+        <td class="yes">Yes — until overwritten</td>
+        <td class="no">No — not full pages</td>
+        <td>Memory fragments paged to disk when RAM was full. Can contain passwords, URL strings, document content, and attacker command output. Best analysed with strings search.</td>
+        <td class="caveat">Non-sequential 4KB chunks — cannot reconstruct process structures. Location: C:\pagefile.sys. Tool: bulk_extractor, strings, FTK Imager for extraction.</td>
+      </tr>
+      <tr>
+        <td>swapfile.sys</td>
+        <td class="part">UWP app memory only</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td>Stores suspended Microsoft Store (UWP) app state. Can reveal activity of Store apps that are no longer running.</td>
+        <td class="caveat">Windows 10+ only. Limited to Store apps. Location: C:\swapfile.sys alongside pagefile.sys.</td>
+      </tr>
+      <tr>
+        <td>Crash dumps (minidump / kernel)</td>
+        <td class="part">Partial or full</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>BSOD crash dumps can reveal malware that triggered a kernel exception or anti-analysis technique. Faulting module named in dump header.</td>
+        <td class="caveat">Minidumps: C:\Windows\Minidump\. Full kernel dump: C:\Windows\MEMORY.DMP. Not always present. Requires crash to have occurred.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── POWERSHELL ARTEFACTS ───────────────────────────────── -->
+<div class="section">
+  <div class="section-label">PowerShell Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves execution?</th>
+        <th>Survives deletion?</th>
+        <th>Has timestamps?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>ConsoleHost_history.txt</td>
+        <td class="yes">Yes — commands typed</td>
+        <td class="no">No — easily deleted</td>
+        <td class="no">No per-command timestamps</td>
+        <td>Plaintext log of every command typed interactively. Attacker tooling, download cradles, lateral movement commands. Per-user profile.</td>
+        <td class="caveat">Location: %APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt. File $SI modified time = last command run. Can be disabled with Set-PSReadlineOption -HistorySaveStyle SaveNothing — absence of file is itself suspicious.</td>
+      </tr>
+      <tr>
+        <td>PowerShell Script Block Logging (Event ID 4104)</td>
+        <td class="yes">Strong</td>
+        <td class="part">Until log rotation</td>
+        <td class="yes">Yes — per event</td>
+        <td>Logs decoded script block content including AMSI-bypassed and obfuscated scripts. Captures what actually executed, not just what was typed. Highest fidelity PowerShell artefact.</td>
+        <td class="caveat">Requires Group Policy enablement. Log: Microsoft-Windows-PowerShell/Operational. Event ID 4104 = script block. 4103 = module logging. Not enabled by default on all systems.</td>
+      </tr>
+      <tr>
+        <td>PowerShell Transcripts</td>
+        <td class="yes">Strong</td>
+        <td class="yes">Until deleted</td>
+        <td class="yes">Session start/end timestamps</td>
+        <td>Full input and output of a PowerShell session including command results — not just commands. Closest to a session recording.</td>
+        <td class="caveat">Requires GPO enablement (Transcription policy). Location is administrator-configured — typically C:\Users\&lt;user&gt;\Documents\PowerShell_Transcripts\ or central share. Not on by default.</td>
+      </tr>
+      <tr>
+        <td>PowerShell Operational Log (Event ID 400/600)</td>
+        <td class="yes">Yes</td>
+        <td class="part">Until log rotation</td>
+        <td class="yes">Yes</td>
+        <td>Engine start (400) and stop (600). HostApplication field reveals what process launched PowerShell — distinguishes interactive session from malware invoking powershell.exe.</td>
+        <td class="caveat">Log: Windows PowerShell (classic). Event ID 400 records the PowerShell version, which can detect downgrade attacks (attacker forcing v2 to bypass logging).</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── WINDOWS EVENT LOGS ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Windows Event Logs — Key IDs</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Event ID</th>
+        <th>Log</th>
+        <th>What it proves</th>
+        <th>Investigative context</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>4624</td><td>Security</td><td>Successful logon</td><td class="caveat">Logon Type critical: 2=Interactive, 3=Network, 4=Batch, 5=Service, 7=Unlock, 10=RemoteInteractive (RDP), 11=CachedInteractive. Type 3 + NTLM = lateral movement candidate. Type 10 = RDP.</td></tr>
+      <tr><td>4625</td><td>Security</td><td>Failed logon</td><td class="caveat">Brute force, credential stuffing, password spraying. Sub Status 0xC000006A = wrong password, 0xC0000064 = unknown username.</td></tr>
+      <tr><td>4634 / 4647</td><td>Security</td><td>Logoff / user-initiated logoff</td><td class="caveat">Pair with 4624 to calculate session duration. 4647 = user clicked logoff. 4634 = session terminated.</td></tr>
+      <tr><td>4648</td><td>Security</td><td>Explicit credential use (runas)</td><td class="caveat">Pass-the-Hash, runas, and lateral movement tools often generate this. Shows which account's credentials were used and against which target.</td></tr>
+      <tr><td>4672</td><td>Security</td><td>Special privilege logon</td><td class="caveat">Generated when an account with admin/sensitive privileges logs on. Always paired with 4624. High-value accounts should always generate this.</td></tr>
+      <tr><td>4688</td><td>Security</td><td>Process creation</td><td class="caveat">Requires audit process creation + command line logging GPO. Shows parent process, new process, and full command line. Near-equivalent to Sysmon Event 1 without Sysmon.</td></tr>
+      <tr><td>4698 / 4702</td><td>Security</td><td>Scheduled task created / updated</td><td class="caveat">Attacker persistence via scheduled tasks. 4699 = deleted, 4700/4701 = enabled/disabled. Correlate with TaskScheduler/Operational log IDs 106/140/141.</td></tr>
+      <tr><td>4720 / 4726</td><td>Security</td><td>User account created / deleted</td><td class="caveat">Attacker-created accounts for persistence or lateral movement. 4732/4733 = added/removed from security group. 4756/4757 = universal group changes.</td></tr>
+      <tr><td>4776</td><td>Security</td><td>NTLM authentication attempt</td><td class="caveat">Local NTLM credential validation. Error code 0xC0000064/0xC000006A for failures. Presence of NTLM where Kerberos expected = potential lateral movement or downgrade.</td></tr>
+      <tr><td>4768 / 4769 / 4771</td><td>Security</td><td>Kerberos TGT / service ticket / pre-auth failure</td><td class="caveat">4769 with RC4 encryption type (0x17) = Kerberoasting indicator. 4768 failure = AS-REP Roasting. 4771 = pre-auth failure (brute force of Kerberos accounts).</td></tr>
+      <tr><td>1102 / 104</td><td>Security / System</td><td>Audit log cleared</td><td class="caveat">1102 = Security log cleared. 104 = other log cleared. Anti-forensics indicator — attacker covering tracks. Presence of these IDs with no preceding events = suspicious gap.</td></tr>
+      <tr><td>7034 / 7045</td><td>System</td><td>Service crashed / new service installed</td><td class="caveat">7045 = new service installed — attacker persistence via service. Correlate service name and ImagePath with SYSTEM hive Services key. 7034 = service crashed unexpectedly (may indicate AV killing malware).</td></tr>
+      <tr><td>1149</td><td>TerminalServices-RemoteConnectionManager</td><td>RDP connection initiated</td><td class="caveat">Records remote connection even if authentication fails. Source IP and username. Persists even if Security log is cleared. Critical server-side RDP evidence.</td></tr>
+      <tr><td>4104</td><td>PowerShell/Operational</td><td>Script block executed</td><td class="caveat">Decoded PowerShell content including obfuscated/AMSI-bypassed scripts. Requires Script Block Logging GPO. Highest fidelity PS execution evidence.</td></tr>
+      <tr><td>5140 / 5145</td><td>Security</td><td>Network share accessed / file access checked</td><td class="caveat">5140 = share connection. 5145 = detailed file access within share. PsExec uses ADMIN$ share — 5140 + service creation (7045) = strong PsExec indicator.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── LATERAL MOVEMENT ARTEFACTS ────────────────────────── -->
+<div class="section">
+  <div class="section-label">Lateral Movement Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Technique</th>
+        <th>Host artefacts (source)</th>
+        <th>Host artefacts (destination)</th>
+        <th>Event log evidence</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PsExec</td>
+        <td>ShimCache / Prefetch for psexec.exe. tsclient MRU if via RDP first. NTUSER Run key if persistent.</td>
+        <td>PSEXESVC.exe in System32. Service creation in SYSTEM hive. Prefetch for PSEXESVC.exe.</td>
+        <td class="caveat">Source: 4648 (explicit creds). Dest: 7045 (service install), 5140 (ADMIN$ share access), 4624 Type 3, 4688 (PSEXESVC process).</td>
+        <td class="caveat">Named pipe artefact: \\target\pipe\PSEXESVC. PSEXESVC.exe deleted after session but Prefetch entry persists.</td>
+      </tr>
+      <tr>
+        <td>RDP (Remote Desktop)</td>
+        <td>tsclient MRU (target hostname). RDP Bitmap Cache (session screenshots). ShimCache for mstsc.exe.</td>
+        <td>Event ID 1149 (connection). 4624 Type 10 (logon). RDP session registry keys. Prefetch for rdpclip.exe, tsclient.</td>
+        <td class="caveat">Source: 4648. Dest: 1149 (TerminalServices), 4624 Type 10, 4778/4779 (reconnect/disconnect), 4647 (logoff).</td>
+        <td class="caveat">Bitmap cache reconstructs partial session screen. HKCU\Software\Microsoft\Terminal Server Client\Default on source.</td>
+      </tr>
+      <tr>
+        <td>WMI (wmic / Invoke-WMIMethod)</td>
+        <td>Prefetch for wmic.exe. PowerShell history / Script Block log if PS-based. ShimCache.</td>
+        <td>WMI repository activity. Process creation as child of WmiPrvSE.exe (4688). No service creation — harder to detect.</td>
+        <td class="caveat">Source: 4648. Dest: 4624 Type 3, 4688 (child of WmiPrvSE.exe), Event ID 5857/5858/5859/5860/5861 in WMI-Activity/Operational log.</td>
+        <td class="caveat">Fileless — no binary dropped on destination. WMI-Activity log Event ID 5861 = new permanent subscription created (persistence).</td>
+      </tr>
+      <tr>
+        <td>Pass-the-Hash (PTH)</td>
+        <td>Mimikatz Prefetch / ShimCache. lsass.exe access in Sysmon Event 10.</td>
+        <td>4624 Type 3 with NtLmSsp authentication package. No Kerberos TGT (4768) preceding it.</td>
+        <td class="caveat">4624 Type 3 + NTLM + no prior 4768 = PTH indicator. 4648 on source. Look for lateral movement pattern: multiple Type 3 logons from same source in short window.</td>
+        <td class="caveat">Legitimate NTLM Type 3 logons exist — context and clustering matter. Workgroup environments use NTLM legitimately.</td>
+      </tr>
+      <tr>
+        <td>PowerShell Remoting (WinRM)</td>
+        <td>PowerShell history / Event ID 4103/4104 on source. Prefetch for wsmprovhost.exe.</td>
+        <td>wsmprovhost.exe process creation (4688). 4624 Type 3. WinRM service activity. Event ID 6 in PowerShell/Operational.</td>
+        <td class="caveat">Source: 4648, 4103/4104. Dest: 4624 Type 3, 4688 (wsmprovhost.exe as child of svchost.exe), Microsoft-Windows-WinRM/Operational log.</td>
+        <td class="caveat">Requires WinRM enabled on destination. Default port 5985 (HTTP) / 5986 (HTTPS). Encrypted — network capture shows no plaintext.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── CLOUD STORAGE ARTEFACTS ───────────────────────────── -->
+<div class="section">
+  <div class="section-label">Cloud Storage Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves cloud activity?</th>
+        <th>Survives uninstall?</th>
+        <th>Has timestamps?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>OneDrive — registry (NTUSER.DAT)</td>
+        <td class="yes">Account linkage</td>
+        <td class="part">Partial</td>
+        <td class="part">Key LastWrite</td>
+        <td>Linked account email, tenant ID, sync folder path, personal vs Business1 account differentiation. SPOResourceID links to SharePoint instance.</td>
+        <td class="caveat">Key: NTUSER\Software\Microsoft\OneDrive\Accounts\Personal and \Business1. Shared folders under \Tenants subkey. Uninstall leaves deleted directory artefact.</td>
+      </tr>
+      <tr>
+        <td>OneDrive — sync logs (.odl files)</td>
+        <td class="yes">Strong</td>
+        <td class="part">Partial</td>
+        <td class="yes">Per-operation timestamps</td>
+        <td>Uploads, downloads, renames, deletions, and sharing activity. Reconstructs what files moved to/from cloud even if locally deleted.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Microsoft\OneDrive\logs\. SyncEngine.odl = sync operations + file hashes. TraceCurrent.ETL and TraceArchive.ETL also present. Binary format — requires OneDriveExplorer or odl-parser.</td>
+      </tr>
+      <tr>
+        <td>OneDrive — SyncEngineDatabase.db</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td class="yes">Yes</td>
+        <td>SQLite database linking local Windows account to Microsoft identity. Exposes structure of synchronised cloud data including cloud-only files (placeholders) that never fully downloaded.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Microsoft\OneDrive\settings\. UserCid.dat contains the CID (cloud identity). Cloud-only files show as placeholders in %USERPROFILE%\OneDrive\.</td>
+      </tr>
+      <tr>
+        <td>OneDrive — SyncDiagnostics.log</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td class="yes">Yes</td>
+        <td>Upload/download rates, file counts, folder structure. High-level sync activity summary useful for establishing data volume and sync state at time of collection.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Microsoft\OneDrive\logs\Personal\SyncDiagnostics.log. Human-readable text format.</td>
+      </tr>
+      <tr>
+        <td>Google Drive — Sync_log.log</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td class="yes">Yes</td>
+        <td>Account email, filenames, timestamps, MD5 hashes of synced files. Deleted files appear in log with MD5. Proves file content even if deleted locally.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Google\Drive\user_default\Sync_log.log. Cloud_graph\Cloud_graph.db is SQLite containing cloud_graph_entry table.</td>
+      </tr>
+      <tr>
+        <td>Dropbox — filecache.db</td>
+        <td class="yes">Yes</td>
+        <td class="part">Partial</td>
+        <td class="yes">Yes</td>
+        <td>All files and folders synchronised with Dropbox. host_id in config.db can authenticate to cloud API if not revoked.</td>
+        <td class="caveat">Database is encrypted with DPAPI-derived key. NTUSER.DAT\Software\Dropbox\ks\client holds the encrypted key. Decryption requires Dropbox DPAPI key recovery. Tool: dropbox-key-recovery.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── CREDENTIAL ARTEFACTS ──────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Credential Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Contains credentials?</th>
+        <th>Survives reboot?</th>
+        <th>Admin required to access?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Windows Credential Manager</td>
+        <td class="yes">Yes — encrypted</td>
+        <td class="yes">Yes</td>
+        <td class="no">No (user-accessible)</td>
+        <td>Saved passwords for websites, network shares, RDP targets, and applications. Reveals what resources the user authenticated to and saved credentials for.</td>
+        <td class="caveat">Location: %APPDATA%\Microsoft\Credentials\ and %LOCALAPPDATA%\Microsoft\Credentials\. Encrypted with DPAPI. Tool: Mimikatz dpapi::cred or offline with master key. Registry: HKCU\Software\Microsoft\Credentials.</td>
+      </tr>
+      <tr>
+        <td>DPAPI Master Keys</td>
+        <td class="yes">Encryption keys</td>
+        <td class="yes">Yes</td>
+        <td class="no">No (user-accessible)</td>
+        <td>Master keys decrypt Credential Manager, browser saved passwords, and certificate private keys. Possession of master key + SYSTEM/SECURITY hive enables offline credential decryption.</td>
+        <td class="caveat">Location: %APPDATA%\Microsoft\Protect\&lt;SID&gt;\. Encrypted with user password hash derivation. Requires SYSTEM + SECURITY hives for offline decryption. Tools: Mimikatz, dpapick.</td>
+      </tr>
+      <tr>
+        <td>SAM + SYSTEM hive (NTLM hashes)</td>
+        <td class="yes">NTLM password hashes</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes — SYSTEM privilege</td>
+        <td>Local account password hashes for offline cracking or Pass-the-Hash. Combined with SYSTEM hive bootkey for decryption.</td>
+        <td class="caveat">Locked on live system — requires VSS or raw disk access. Offline: both SAM and SYSTEM hives required. Tools: secretsdump (Impacket), samdump2. Protected by Credential Guard on modern systems.</td>
+      </tr>
+      <tr>
+        <td>Browser saved passwords (Login Data)</td>
+        <td class="yes">Yes — DPAPI encrypted</td>
+        <td class="yes">Yes</td>
+        <td class="no">No</td>
+        <td>Saved website credentials. Reveals phishing site credential submission if user saved creds to attacker-controlled site.</td>
+        <td class="caveat">Chrome/Edge: %LOCALAPPDATA%\Google\Chrome\User Data\Default\Login Data (SQLite). Passwords encrypted with DPAPI or App-Bound Encryption (Chrome v127+). Live system: tools like SharpChrome. Dead box: DPAPI key chain required.</td>
+      </tr>
+      <tr>
+        <td>LSA Secrets (SECURITY hive)</td>
+        <td class="yes">Service account creds</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes — SYSTEM</td>
+        <td>Cached domain credentials, service account passwords, DPAPI system key, VPN/dial-up credentials. High-value target for attackers.</td>
+        <td class="caveat">Location: HKLM\SECURITY\Policy\Secrets\. Locked on live system. Offline: SYSTEM + SECURITY hives. Tools: secretsdump, Mimikatz lsadump::secrets.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── WEB SERVER ARTEFACTS ───────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Web Server Artefacts (IIS / HTTP.sys)</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves request activity?</th>
+        <th>Survives IIS restart?</th>
+        <th>Has timestamps?</th>
+        <th>Key forensic value</th>
+        <th>Paths, tools &amp; caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>IIS W3C Access Logs <span class="tag tag-network">web</span></td>
+        <td class="yes">Strong — all requests that reached IIS</td>
+        <td class="yes">Yes</td>
+        <td class="yes">UTC per request</td>
+        <td>Every HTTP request that reached and was processed by IIS — method, URI, source IP, user agent, status code, bytes sent/received, time-taken. Primary web investigation artefact. Records webshell access, exploitation attempts, and C2 communication over HTTP/HTTPS. The <code>cs-uri-stem</code> + <code>cs-uri-query</code> + <code>cs(User-Agent)</code> combination is the key triage triad for detecting webshells and exploit payloads.</td>
+        <td class="caveat">
+          <strong>Default path:</strong> <code>C:\inetpub\logs\LogFiles\W3SVC&lt;SiteID&gt;\u_ex&lt;YYMMDD&gt;.log</code><br>
+          Site ID visible in IIS Manager → Sites. Admin may have changed location — check IIS config or <code>%SystemDrive%\inetpub\logs\</code>.<br>
+          Exchange: <code>C:\inetpub\logs\LogFiles\W3SVC1\</code> (OWA/ECP) and <code>W3SVC2\</code> (Autodiscover)<br><br>
+          <strong>Collection:</strong> KAPE (Target: <code>IISLogFiles</code> or <code>WebServers</code>)<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; Log Parser 2.2: <code>LogParser.exe "SELECT c-ip, cs-uri-stem, cs(User-Agent), sc-status, cs-method FROM '*.log' WHERE sc-status=200 AND cs-method='POST'" -i:W3C</code><br>
+          &bull; PowerShell quick parse: <code>Get-Content u_ex*.log | Where-Object { $_ -notmatch "^#" } | ConvertFrom-Csv -Delimiter " " -Header "date","time","s-ip","cs-method","cs-uri-stem","cs-uri-query","s-port","cs-username","c-ip","cs(User-Agent)","cs(Referer)","sc-status","sc-substatus","sc-win32-status","time-taken"</code><br>
+          &bull; Timesketch / Splunk for timeline correlation across multiple log files<br><br>
+          <strong>Caveats:</strong> Timestamps UTC — normalise before timeline. sc-status 200 + cs-method POST to a static file extension (.jpg, .png, .css) = webshell IOC. time-taken outlier for a specific URI may indicate RCE activity. Logs do NOT record requests rejected by HTTP.sys — see httperr.log for those.</td>
+      </tr>
+      <tr>
+        <td>httperr.log (HTTP.sys error log) <span class="tag tag-network">web</span></td>
+        <td class="yes">Yes — requests rejected before reaching IIS</td>
+        <td class="yes">Yes — written by kernel driver</td>
+        <td class="yes">UTC per entry</td>
+        <td>Written by HTTP.sys (kernel-mode driver) — not IIS. Captures requests that <strong>never reached the IIS worker process</strong>. Unique forensic value: records exploit attempts invisible to IIS W3C logs, and RCE attempts that crash the app pool (crash appears here, IIS log has no entry because w3wp.exe died before writing). Fields: c-ip, cs-method, cs-uri, s-reason (key field), s-queuename.<br><br>
+        <strong>s-reason forensic values:</strong><br>
+        &bull; <code>Timer_ConnectionIdle</code> — scanner probe / keep-alive timeout<br>
+        &bull; <code>Verb</code> — unusual HTTP method (PROPFIND/SEARCH/TRACK = WebDAV CVE, ProxyShell)<br>
+        &bull; <code>URL</code> — malformed URL, path traversal, %2e/%00 encoded payload rejected by HTTP.sys<br>
+        &bull; <code>Header</code> — invalid headers, payload-in-header attacks (Log4Shell in User-Agent or X-Forwarded-For)<br>
+        &bull; <code>Connection_Abandoned_By_AppPool</code> — w3wp.exe crashed mid-request (RCE trigger — correlate with 4688 child processes)<br>
+        &bull; <code>AppOffline</code> — app pool offline when request arrived (post-crash state)</td>
+        <td class="caveat">
+          <strong>Path:</strong> <code>C:\Windows\System32\LogFiles\HTTPERR\httperr&lt;N&gt;.log</code> (rotated by size ~1MB)<br>
+          Applies to all HTTP.sys consumers: IIS, Exchange, SharePoint, WinRM (5985), RDP over HTTP (3389)<br><br>
+          <strong>Collection:</strong> KAPE (Target: <code>IISLogFiles</code>) or manual copy<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; PowerShell parse (handles streamid column correctly):<br>
+          <code>$h = "date","time","c-ip","c-port","s-ip","s-port","cs-version","cs-method","cs-uri","streamid","sc-status","s-siteid","s-reason","s-queuename"<br>
+          $logs = Get-Content "C:\Windows\System32\LogFiles\HTTPERR\*.log" | Where-Object { $_ -notmatch "^#" } | ConvertFrom-Csv -Delimiter " " -Header $h<br>
+          $logs | Group-Object "s-reason" | Sort-Object Count -Descending</code><br>
+          &bull; Log Parser 2.2 (pre-HTTP API 2.0 only — streamid breaks native HTTPErr mode): use TSV mode with custom header file<br>
+          &bull; Top source IPs: <code>$logs | Group-Object "c-ip" | Sort-Object Count -Descending | Select -First 20</code><br>
+          &bull; Hunt AppPool crashes by URI: <code>$logs | Where-Object { $_."s-reason" -eq "Connection_Abandoned_By_AppPool" } | Group-Object "cs-uri" | Sort-Object Count -Descending</code><br><br>
+          <strong>Caveats:</strong> Timestamps UTC. streamid column (HTTP API 2.0, Win2012+) breaks Log Parser's native -i:HTTPErr — use PowerShell or TSV workaround. Correlate same c-ip across httperr (probe errors) and IIS W3C (subsequent successful requests) to identify probe-then-exploit pattern.</td>
+      </tr>
+      <tr>
+        <td>w3wp.exe child process artefacts <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes — webshell/RCE execution evidence</td>
+        <td class="yes">Yes (Prefetch / Event Logs)</td>
+        <td class="yes">Yes — per execution</td>
+        <td>The IIS worker process (w3wp.exe) should never spawn interactive child processes under normal operation. Any child process of w3wp.exe is a high-fidelity webshell execution or RCE indicator. Child processes seen in attacks: cmd.exe, powershell.exe, cscript.exe, wscript.exe, mshta.exe, certutil.exe, bitsadmin.exe, net.exe, whoami.exe. Prefetch for these child processes with w3wp.exe as parent proves a webshell was executed at that timestamp. Each child process Prefetch file lists the files accessed in the first 10 seconds — may reveal the webshell file path directly.</td>
+        <td class="caveat">
+          <strong>Prefetch paths:</strong> <code>C:\Windows\Prefetch\CMD.EXE-XXXXXXXX.pf</code>, <code>POWERSHELL.EXE-XXXXXXXX.pf</code>, etc.<br>
+          <strong>Event Log:</strong> Security EID 4688 (Process Creation) — requires audit process creation + command line GPO<br>
+          <strong>Sysmon EID 1</strong> (ProcessCreate): <code>C:\Windows\System32\winevt\Logs\Microsoft-Windows-Sysmon%4Operational.evtx</code><br><br>
+          <strong>Collection:</strong> KAPE (Targets: <code>Prefetch</code>, <code>EventLogs</code>, <code>Sysmon</code>)<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; PECmd (Eric Zimmerman) — parse all Prefetch: <code>PECmd.exe -d C:\Windows\Prefetch\ --csv . --csvf prefetch_all.csv</code><br>
+          Filter for cmd/powershell with w3wp parent: <code>Import-Csv prefetch_all.csv | Where-Object { $_.ExecutableName -match "cmd|powershell|cscript|wscript" }</code> then correlate timestamps with IIS W3C logs<br>
+          &bull; Sysmon EID 1 hunt (parent w3wp): <code>Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" | Where-Object { $_.Id -eq 1 -and $_.Message -match "w3wp" }</code><br>
+          &bull; Security EID 4688 hunt: <code>Get-WinEvent -LogName Security | Where-Object { $_.Id -eq 4688 -and $_.Message -match "w3wp" }</code><br>
+          &bull; Hayabusa / Chainsaw for bulk Sigma rule matching against Sysmon/Security event logs<br><br>
+          <strong>Caveats:</strong> Prefetch is disabled on Server OS by default — enable via registry <code>HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters\EnablePrefetcher = 3</code> or rely on Sysmon/4688. On a compromised host, the webshell file may have been deleted — Prefetch "files loaded" section may still reference its path.</td>
+      </tr>
+      <tr>
+        <td>IIS application pool crash (App Event Log) <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes — crash timing correlates with exploit</td>
+        <td class="yes">Yes</td>
+        <td class="yes">Yes</td>
+        <td>When an IIS application pool crashes due to an RCE exploit, Windows Error Reporting logs an Event ID 1000 (Application Error) in the Application event log with the faulting module and exception code. Correlating this crash timestamp with httperr.log <code>Connection_Abandoned_By_AppPool</code> entries and IIS W3C logs pins the exact exploit request that caused the crash.</td>
+        <td class="caveat">
+          <strong>Path:</strong> <code>C:\Windows\System32\winevt\Logs\Application.evtx</code><br>
+          Event IDs: <strong>1000</strong> (Application Error — faulting process w3wp.exe), <strong>1001</strong> (Windows Error Reporting — crash follow-up)<br><br>
+          <strong>Collection:</strong> KAPE (Target: <code>EventLogs</code>) or <code>wevtutil epl Application Application.evtx</code><br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; EvtxECmd: <code>EvtxECmd.exe -f Application.evtx --csv . --csvf app_events.csv</code><br>
+          &bull; PowerShell: <code>Get-WinEvent -LogName Application | Where-Object { $_.Id -eq 1000 -and $_.Message -match "w3wp" } | Select-Object TimeCreated, Message</code><br><br>
+          <strong>Caveats:</strong> Minidumps from w3wp.exe crashes may also be written to <code>C:\Windows\Minidump\</code> or <code>C:\inetpub\temp\</code> — parse with Volatility or WinDbg for the faulting instruction. Crash dump timestamp is the most precise anchor for correlating the exploit request in httperr + IIS logs.</td>
+      </tr>
+      <tr>
+        <td>Webshell file on disk <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes — direct evidence of compromise</td>
+        <td class="yes">Until deleted</td>
+        <td class="yes">MACB timestamps (check FN vs SI)</td>
+        <td>A webshell is a script or executable dropped into the web root to provide persistent remote code execution. Common extensions: .aspx, .asp, .php, .ashx, .asmx, .svc. Key investigative steps: identify the file, establish when it was dropped (MFT ctime vs SI), identify the request that dropped it (POST to upload endpoint in IIS logs), and recover any commands executed through it (w3wp child process artefacts).</td>
+        <td class="caveat">
+          <strong>Common web root paths:</strong><br>
+          IIS default: <code>C:\inetpub\wwwroot\</code><br>
+          Exchange OWA: <code>C:\Program Files\Microsoft\Exchange Server\V15\FrontEnd\HttpProxy\owa\auth\</code><br>
+          Exchange ECP: <code>C:\Program Files\Microsoft\Exchange Server\V15\ClientAccess\ecp\</code><br>
+          SharePoint: <code>C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\&lt;version&gt;\TEMPLATE\LAYOUTS\</code><br><br>
+          <strong>Hunt commands:</strong><br>
+          &bull; Find recently modified files in web root: <code>Get-ChildItem -Recurse C:\inetpub\wwwroot\ | Where-Object { $_.LastWriteTime -gt (Get-Date).AddDays(-30) } | Sort-Object LastWriteTime -Descending</code><br>
+          &bull; MFTECmd SI vs FN comparison for timestomping: <code>MFTECmd.exe -f $MFT --csv . --csvf mft.csv</code> then filter for web root paths<br>
+          &bull; Webshell content hunt: <code>Select-String -Path C:\inetpub\wwwroot\*.aspx -Pattern "eval|exec|cmd|shell|system|passthru|base64_decode" -Recurse</code><br>
+          &bull; YARA scan: <code>yara webshell_rules.yar C:\inetpub\wwwroot\ -r</code><br><br>
+          <strong>Caveats:</strong> SI timestamps may be stomped — always compare against FN timestamps in MFT and UsnJrnl. Zone.Identifier ADS absent = file was not downloaded from the internet (written by a process, not a browser). Webshells in Exchange attack chains often appear in the auth\ or ecp\ directories — check these first on Exchange servers.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── BITS ARTEFACTS ──────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">BITS (Background Intelligent Transfer Service) Artefacts</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>Proves execution?</th>
+        <th>Survives reboot?</th>
+        <th>Has timestamps?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>QMGR database (qmgr.db / qmgr0.dat) <span class="tag tag-exec">primary</span></td>
+        <td class="yes">Yes — job definition, source URL, destination path, owner SID</td>
+        <td class="yes">Yes — persists across reboots</td>
+        <td class="yes">CreationTime, ModifiedTime per job</td>
+        <td>The Queue Manager database is the single most important BITS artefact. Contains active and recoverable deleted BITS job records including: JobType (download/upload), JobName, source URL, local destination path, owning user SID, creation and modification timestamps, job state, and crucially <strong>SetNotifyCmdLine</strong> — the command executed when a job completes or errors. This is the primary BITS persistence mechanism — a malicious notify command re-executes indefinitely across reboots even after the original malware is remediated, as long as the job remains in the database.</td>
+        <td class="caveat">
+          <strong>Paths:</strong><br>
+          Pre-Win10: <code>C:\ProgramData\Microsoft\Network\Downloader\qmgr0.dat</code> + <code>qmgr1.dat</code> (proprietary binary)<br>
+          Win10+: <code>C:\ProgramData\Microsoft\Network\Downloader\qmgr.db</code> (ESE format) + <code>edb.log</code>, <code>edbXXXXX.log</code><br><br>
+          <strong>Collection:</strong> BITS service holds qmgr.db open without sharing on live Win10 systems — cannot be opened directly. Collect via KAPE (Target: <code>BITS</code>), VSS snapshot, or offline from disk image. Copy whole Downloader directory.<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; BitsParser (Mandiant/FireEye): <code>python BitsParser.py -i qmgr.db -o out.json --carvedb --carveall</code><br>
+          &bull; bits_parser (ANSSI-FR): <code>python bits_parser.py qmgr0.dat -o results.csv</code><br>
+          &bull; Invoke-BitsParser (PowerShell): <code>Invoke-BitsParser -Path C:\ProgramData\Microsoft\Network\Downloader\</code><br>
+          &bull; Live system query: <code>Get-BitsTransfer -AllUsers | Select-Object JobId,DisplayName,JobState,FileUrl,LocalName,NotifyCmdLine</code><br><br>
+          MITRE ATT&CK: T1197. Use <code>--carvedb --carveall</code> flags to recover deleted records from ESE free pages and transaction log remnants.</td>
+      </tr>
+      <tr>
+        <td>BITS Operational Event Log <span class="tag tag-exec">event log</span></td>
+        <td class="yes">Yes — per-transfer events with source URLs</td>
+        <td class="yes">Until log rotation</td>
+        <td class="yes">Yes — per event</td>
+        <td>Records every BITS transfer. Key event IDs:<br>
+        &bull; <strong>EID 3</strong> — job created (job name, owner SID)<br>
+        &bull; <strong>EID 4</strong> — job completed<br>
+        &bull; <strong>EID 5</strong> — job cancelled<br>
+        &bull; <strong>EID 59</strong> — transfer started; contains job name + <strong>source URL</strong> — most valuable field for C2 domain identification<br>
+        &bull; <strong>EID 60</strong> — transfer completed; status 0x0 = success<br>
+        &bull; <strong>EID 61</strong> — transfer interrupted (error)<br>
+        EID 59 is often the only surviving C2 domain reference when QMGR has been cleared.</td>
+        <td class="caveat">
+          <strong>Path:</strong> <code>C:\Windows\System32\winevt\Logs\Microsoft-Windows-Bits-Client%4Operational.evtx</code><br>
+          Log viewer path: <em>Applications and Services Logs → Microsoft → Windows → Bits-Client → Operational</em><br><br>
+          <strong>Collection:</strong> KAPE (Target: <code>EventLogs</code>) or <code>wevtutil epl "Microsoft-Windows-Bits-Client/Operational" bits.evtx</code><br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; EvtxECmd: <code>EvtxECmd.exe -f "Microsoft-Windows-Bits-Client%4Operational.evtx" --csv . --csvf bits_events.csv</code><br>
+          &bull; PowerShell hunt for EID 59 URLs: <code>Get-WinEvent -LogName "Microsoft-Windows-Bits-Client/Operational" | Where-Object Id -eq 59 | Select-Object TimeCreated, Message</code><br>
+          &bull; Chainsaw: <code>chainsaw hunt bits.evtx --rules sigma_rules/</code><br><br>
+          EID 59/60 do NOT record local destination path — only source URL. Cross-reference with QMGR database. Not enabled by default on all Windows versions — verify presence. Whitelist known-good domains (windowsupdate.com, microsoft.com, dl.delivery.mp.microsoft.com) to isolate anomalies.</td>
+      </tr>
+      <tr>
+        <td>BITS transaction log files (edb.log) <span class="tag tag-exec">carving</span></td>
+        <td class="part">Partial — carving only</td>
+        <td class="yes">Short window — rotated</td>
+        <td class="part">Partial</td>
+        <td>ESE transaction logs alongside qmgr.db on Win10+ may contain job and file records from recently completed or deleted BITS jobs already removed from the main database. Carving can recover deleted C2 URLs and destination paths from attacker activity that was deliberately cleaned up.</td>
+        <td class="caveat">
+          <strong>Paths:</strong> <code>C:\ProgramData\Microsoft\Network\Downloader\edb.log</code> and <code>C:\ProgramData\Microsoft\Network\Downloader\edbXXXXX.log</code> — same directory as qmgr.db<br><br>
+          <strong>Collection:</strong> Copy entire <code>C:\ProgramData\Microsoft\Network\Downloader\</code> directory. Older logs rotate — collect promptly on engagement.<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; BitsParser with carveall: <code>python BitsParser.py -i C:\ProgramData\Microsoft\Network\Downloader\ --carveall -o carved.json</code><br>
+          &bull; strings against raw log: <code>strings edb.log | grep -iE "(http|ftp|smb)://"</code><br><br>
+          Carving produces dirty results — data from adjacent clusters may bleed in. Treat recovered URLs as investigative leads requiring corroboration from event logs or network telemetry, not as definitive evidence.</td>
+      </tr>
+      <tr>
+        <td>bitsadmin.exe / PowerShell Prefetch + ShimCache <span class="tag tag-exec">execution</span></td>
+        <td class="yes">Yes — proves bitsadmin was run</td>
+        <td class="yes">Yes (Prefetch)</td>
+        <td class="yes">Last 8 run timestamps (Prefetch)</td>
+        <td>BITS jobs are created via bitsadmin.exe (legacy CLI) or PowerShell cmdlets (Start-BitsTransfer, Add-BitsFile). Prefetch for bitsadmin.exe confirms it was executed. ShimCache confirms presence on the filesystem. PowerShell BITS commands also appear in ConsoleHost_history.txt and Script Block Logging (EID 4104).</td>
+        <td class="caveat">
+          <strong>Paths:</strong><br>
+          Prefetch: <code>C:\Windows\Prefetch\BITSADMIN.EXE-XXXXXXXX.pf</code><br>
+          ShimCache: SYSTEM hive → <code>CurrentControlSet\Control\Session Manager\AppCompatCache\AppCompatCache</code><br>
+          PS history: <code>%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt</code><br>
+          PS Script Block Log: <code>Microsoft-Windows-PowerShell%4Operational.evtx</code> (EID 4104)<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; PECmd (Eric Zimmerman): <code>PECmd.exe -f "BITSADMIN.EXE-XXXXXXXX.pf" --csv .</code><br>
+          &bull; AppCompatCacheParser: <code>AppCompatCacheParser.exe -f SYSTEM --csv . --csvf shimcache.csv</code> then grep for bitsadmin<br>
+          &bull; EvtxECmd for PS SBL: <code>EvtxECmd.exe -f "Microsoft-Windows-PowerShell%4Operational.evtx" --csv . | findstr /i "Start-BitsTransfer"</code><br><br>
+          bitsadmin.exe is a signed Microsoft binary — bypasses application allowlisting. Legitimate bitsadmin usage is rare on modern systems; Windows Update uses the BITS COM API directly. Any bitsadmin Prefetch entry on a workstation is worth investigating.</td>
+      </tr>
+      <tr>
+        <td>Temp file rename artefact (BITxxxx.tmp) <span class="tag tag-exec">filesystem</span></td>
+        <td class="yes">Yes — proves download completed to disk</td>
+        <td class="no">No — renamed on completion</td>
+        <td class="yes">Via UsnJrnl ($J) / Sysmon EID 11</td>
+        <td>When BITS downloads a file it first writes a temp file matching <code>BIT[hex].tmp</code> in the destination directory, then renames it to the final filename on completion. The UsnJrnl records this rename — old name matches <code>BIT*.tmp</code>, new name is the payload. This definitively links the BITS transfer event (EID 60) to the resulting file on disk, even if the payload was subsequently deleted.</td>
+        <td class="caveat">
+          <strong>Artefact location:</strong> UsnJrnl ($J stream at <code>$Extend\$UsnJrnl:$J</code> on the volume root, not a regular path)<br>
+          Sysmon EID 11 (FileCreate): <code>C:\Windows\System32\winevt\Logs\Microsoft-Windows-Sysmon%4Operational.evtx</code><br><br>
+          <strong>Collection:</strong> KAPE (Target: <code>$J</code> or <code>MFT</code>) — <code>MFTECmd.exe</code> extracts both $MFT and $J. Sysmon log via EvtxECmd.<br><br>
+          <strong>Tools &amp; commands:</strong><br>
+          &bull; MFTECmd (Eric Zimmerman) — extract UsnJrnl: <code>MFTECmd.exe -f "$J" --csv . --csvf usnjrnl.csv</code><br>
+          &bull; Hunt rename events: filter usnjrnl.csv for <code>FileRenameNewName</code> where <code>OldFileName</code> matches <code>BIT*.tmp</code><br>
+          &bull; PowerShell quick hunt: <code>Import-Csv usnjrnl.csv | Where-Object { $_.Reason -match "Rename" -and $_.FileName -match "^BIT.*\.tmp$" }</code><br>
+          &bull; Sysmon EID 11 hunt: <code>Get-WinEvent -LogName "Microsoft-Windows-Sysmon/Operational" | Where-Object { $_.Id -eq 11 -and $_.Message -match "BIT.*\.tmp" }</code><br><br>
+          Correlate UsnJrnl rename timestamp with EID 60 (transfer complete) in the BITS Operational log for the same job to confirm end-to-end evidence chain. This artefact persists independently of whether the payload file was deleted.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── ANTI-FORENSICS INDICATORS ─────────────────────────── -->
+<div class="section">
+  <div class="section-label">Anti-Forensics Indicators</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Technique</th>
+        <th>What the attacker does</th>
+        <th>How to detect it</th>
+        <th>Residual evidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Timestomping</td>
+        <td>Modifies $STANDARD_INFORMATION (SI) timestamps to blend in with legitimate files.</td>
+        <td class="caveat">Compare SI timestamps vs $FILE_NAME (FN) timestamps in MFT. SI/FN mismatch = strong indicator. Tool: MFTECmd.exe outputs both sets.</td>
+        <td class="caveat">FN timestamps cannot be modified without kernel-level access. SI creation time earlier than FN creation time is impossible legitimately — definitive indicator.</td>
+      </tr>
+      <tr>
+        <td>Log clearing</td>
+        <td>Clears Security, System, or Application event logs to erase activity trail.</td>
+        <td class="caveat">Event ID 1102 (Security log cleared) persists in the newly cleared log. Event ID 104 for other logs. Unexplained gap in event log timeline is itself suspicious.</td>
+        <td class="caveat">Log clearing is all-or-nothing — cannot selectively delete events via standard Windows. SRUM, Prefetch, and registry artefacts survive log clearing.</td>
+      </tr>
+      <tr>
+        <td>VSS deletion</td>
+        <td>Deletes Volume Shadow Copies to prevent forensic recovery of previous file/registry states.</td>
+        <td class="caveat">Event ID 8222 (VSS) for snapshot deletion. vssadmin.exe or wmic shadowcopy delete in Prefetch, PowerShell history, 4688 process creation logs.</td>
+        <td class="caveat">Common ransomware pre-encryption step. Absence of VSS snapshots on a system that should have them is suspicious. SRUM may show vssadmin execution.</td>
+      </tr>
+      <tr>
+        <td>Prefetch disabling</td>
+        <td>Sets HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters\EnablePrefetcher to 0.</td>
+        <td class="caveat">Registry key value of 0 = disabled. Key LastWrite timestamp shows when it was changed. Absence of Prefetch files on a workstation OS is suspicious.</td>
+        <td class="caveat">Prefetch is enabled by default on workstations. Disabled by default on Server OS — absence on a server is normal.</td>
+      </tr>
+      <tr>
+        <td>PowerShell history deletion</td>
+        <td>Deletes or renames ConsoleHost_history.txt, or sets SaveNothing history policy.</td>
+        <td class="caveat">Absence of history file where PS was clearly used is suspicious. UsnJrnl may show deletion of the file. Non-PowerShell process (Explorer.exe, cmd.exe) modifying the history file = strong IOC.</td>
+        <td class="caveat">Script Block Logging (Event ID 4104) survives history file deletion — captures commands at execution time, not after. Enable SBL via GPO to counter this technique.</td>
+      </tr>
+      <tr>
+        <td>Tool execution from memory / fileless</td>
+        <td>Executes payload entirely in memory — never writes binary to disk. PowerShell, WMI, .NET reflection.</td>
+        <td class="caveat">Script Block Logging (4104) captures decoded payload. AMSI telemetry. Memory forensics (Volatility malfind). No Prefetch or AmCache entry for the payload.</td>
+        <td class="caveat">SRUM still records network activity by process even for fileless execution. Named pipes in SRUM network data can indicate C2 beaconing process.</td>
+      </tr>
+      <tr>
+        <td>Alternate Data Streams (ADS) for hiding</td>
+        <td>Hides malicious payload in NTFS ADS of a legitimate file (e.g. readme.txt:payload.exe).</td>
+        <td class="caveat">MFTECmd shows ADS streams. streams.exe (Sysinternals) enumerates ADS on live system. ADS larger than parent file is a red flag.</td>
+        <td class="caveat">Zone.Identifier ADS is legitimate (Mark of the Web from internet downloads). Other ADS names on executables or documents are suspicious.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── WINDOWS 11 SPECIFIC ───────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Windows 11 / Modern Windows Specific</div>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Artefact</th>
+        <th>OS version</th>
+        <th>Survives reboot?</th>
+        <th>Key forensic value</th>
+        <th>Caveats</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>PcaAppLaunchDic.txt</td>
+        <td>Win11 22H2+</td>
+        <td class="yes">Yes</td>
+        <td>Execution evidence — pipe-delimited executable path and timestamp. Evidence of execution for binaries that may not appear in Prefetch.</td>
+        <td class="caveat">Location: C:\Windows\appcompat\pca\. Also PcaGeneralDb0.txt and PcaGeneralDb1.txt. Not yet parsed by most mainstream tools — manual review or custom script required.</td>
+      </tr>
+      <tr>
+        <td>Windows Recall (Copilot+ PCs)</td>
+        <td>Win11 24H2+ (opt-in)</td>
+        <td class="yes">Yes</td>
+        <td>Frequent screenshots of user's desktop enabling semantic search. Captures transient content — ephemeral chat messages, displayed passwords, online-only documents that never touched disk.</td>
+        <td class="caveat">Opt-in only. Requires Copilot+ PC with NPU (40+ TOPs). Location: %LOCALAPPDATA%\CoreAIPlatform.00\. Encrypted SQLite database. Forensically significant if enabled — captures what no other artefact does.</td>
+      </tr>
+      <tr>
+        <td>Notepad session restore</td>
+        <td>Win11+</td>
+        <td class="yes">Yes</td>
+        <td>Notepad now persists unsaved tab content across sessions. Can recover unsaved attacker notes, draft commands, or copied data that was never saved to disk.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Packages\Microsoft.WindowsNotepad_*\LocalState\TabState\. Binary format per tab. Tools: notepad-tab-recovery scripts.</td>
+      </tr>
+      <tr>
+        <td>WSL (Windows Subsystem for Linux) artefacts</td>
+        <td>Win10 1607+ / Win11</td>
+        <td class="yes">Yes</td>
+        <td>Linux filesystem and bash history within Windows. Attackers use WSL to execute Linux tooling and bypass Windows security controls and logging.</td>
+        <td class="caveat">Location: %LOCALAPPDATA%\Packages\CanonicalGroupLimited.*\LocalState\rootfs\. Bash history: .bash_history in user home. NTFS ADS not applied to ext4 filesystem inside WSL. Separate forensic methodology required.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<p style="font-size: 11px; color: #334155; margin-top: 2rem; border-top: 1px solid #1e293b; padding-top: 1rem;">
+  Windows Forensics Artefact Value Matrix &mdash; Peli Rufus &mdash; last updated April 2026
+</p>
+
+</body>
+</html>

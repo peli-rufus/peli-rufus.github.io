@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patient Zero Investigation Matrix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#e9e2d0;
+    --paper-dark:#ded5bd;
+    --card:#f2ecdd;
+    --ink:#1c1a15;
+    --navy:#26344a;
+    --navy-deep:#1a2436;
+    --stamp-red:#a3312a;
+    --stamp-green:#3c5c3a;
+    --manila-tab:#cbb583;
+    --line:#b8ac8d;
+  }
+
+  *{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse at top left, rgba(0,0,0,0.04), transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    padding:0 0 80px;
+  }
+
+  /* subtle paper texture */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0px, transparent 1px, transparent 2px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.015) 0px, transparent 1px, transparent 2px);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  header{
+    position:relative;
+    z-index:1;
+    max-width:1100px;
+    margin:0 auto;
+    padding:48px 24px 20px;
+    border-bottom:3px double var(--ink);
+  }
+
+  .case-tag{
+    display:inline-block;
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:11px;
+    letter-spacing:2px;
+    text-transform:uppercase;
+    background:var(--navy-deep);
+    color:var(--paper);
+    padding:4px 10px;
+    margin-bottom:14px;
+  }
+
+  h1{
+    font-family:'Special Elite', monospace;
+    font-size:clamp(28px, 5vw, 44px);
+    margin:0 0 8px;
+    letter-spacing:0.5px;
+    line-height:1.15;
+  }
+
+  .subtitle{
+    font-size:14px;
+    color:#4b4738;
+    max-width:640px;
+    line-height:1.5;
+  }
+
+  .meta-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:24px;
+    margin-top:18px;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#5b5748;
+  }
+  .meta-row strong{color:var(--ink);}
+
+  /* Legend / stamp key */
+  .legend{
+    position:relative; z-index:1;
+    max-width:1100px;
+    margin:22px auto 0;
+    padding:0 24px;
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .stamp{
+    font-family:'Special Elite', monospace;
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    border:2px solid;
+    border-radius:3px;
+    padding:4px 10px;
+    transform:rotate(-2deg);
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    opacity:0.9;
+  }
+  .stamp.green{color:var(--stamp-green); border-color:var(--stamp-green);}
+  .stamp.red{color:var(--stamp-red); border-color:var(--stamp-red);}
+  .stamp.navy{color:var(--navy); border-color:var(--navy); transform:rotate(1.5deg);}
+  .legend-note{font-size:11px; color:#5b5748;}
+
+  /* Phase tabs styled like folder tabs */
+  .tabs{
+    position:relative; z-index:1;
+    max-width:1100px;
+    margin:32px auto 0;
+    padding:0 24px;
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .tab{
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    background:var(--manila-tab);
+    color:var(--ink);
+    border:1px solid var(--ink);
+    border-bottom:none;
+    padding:9px 16px 8px;
+    border-radius:6px 6px 0 0;
+    cursor:pointer;
+    opacity:0.6;
+    transition:opacity 0.15s ease, transform 0.15s ease;
+    transform:translateY(3px);
+  }
+  .tab:hover{opacity:0.85;}
+  .tab.active{
+    opacity:1;
+    background:var(--card);
+    transform:translateY(0);
+  }
+
+  main{
+    position:relative; z-index:1;
+    max-width:1100px;
+    margin:0 auto;
+  }
+
+  .board{
+    background:var(--card);
+    border:1px solid var(--ink);
+    padding:6px;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12.5px;
+  }
+
+  thead th{
+    text-align:left;
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:10.5px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    color:var(--paper);
+    background:var(--navy-deep);
+    padding:10px 12px;
+  }
+  thead th:first-child{width:34px; text-align:center;}
+
+  tbody tr{
+    border-bottom:1px solid var(--line);
+  }
+  tbody tr:last-child{border-bottom:none;}
+  tbody tr:hover{background:rgba(38,52,74,0.05);}
+
+  td{
+    padding:12px;
+    vertical-align:top;
+    line-height:1.45;
+  }
+  td.idx{
+    font-family:'Special Elite', monospace;
+    color:var(--navy);
+    text-align:center;
+    font-size:14px;
+  }
+  td.step strong{
+    display:block;
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-size:13.5px;
+    font-weight:700;
+    margin-bottom:3px;
+  }
+  td.step span.desc{
+    color:#4b4738;
+    font-size:12px;
+  }
+  td.tools{color:var(--navy); font-size:12px;}
+  td.tools em{font-style:normal; color:#8a8367;}
+
+  .auth-pill{
+    display:inline-block;
+    font-family:'Special Elite', monospace;
+    font-size:10px;
+    letter-spacing:1px;
+    text-transform:uppercase;
+    padding:3px 8px;
+    border-radius:3px;
+    border:1.5px solid;
+    white-space:nowrap;
+  }
+  .auth-osint{color:var(--stamp-green); border-color:var(--stamp-green);}
+  .auth-req{color:var(--stamp-red); border-color:var(--stamp-red);}
+
+  .guide-board{padding:20px 22px;}
+  .guide-intro{
+    font-size:12.5px;
+    color:#4b4738;
+    line-height:1.55;
+    padding-bottom:16px;
+    margin-bottom:16px;
+    border-bottom:1px solid var(--line);
+  }
+  .guide-intro strong{color:var(--ink);}
+
+  .guide-phase-head{
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--paper);
+    background:var(--navy-deep);
+    padding:8px 12px;
+    margin:22px 0 12px;
+  }
+  .guide-phase-head:first-of-type{margin-top:0;}
+
+  .guide-card{
+    display:flex;
+    gap:16px;
+    padding:14px 4px;
+    border-bottom:1px solid var(--line);
+  }
+  .guide-card:last-child{border-bottom:none;}
+
+  .gc-num{
+    font-family:'Special Elite', monospace;
+    font-size:20px;
+    color:var(--navy);
+    flex:0 0 40px;
+    line-height:1.2;
+  }
+  .gc-body{flex:1; min-width:0;}
+  .gc-title{
+    font-family:'IBM Plex Sans Condensed', sans-serif;
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:6px;
+  }
+  .gc-tool{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:500;
+    font-size:11.5px;
+    color:var(--stamp-red);
+    margin-left:6px;
+  }
+  .gc-body p{
+    font-size:12.5px;
+    line-height:1.55;
+    margin:0 0 8px;
+    color:#332f24;
+  }
+  .gc-body code{
+    background:var(--paper-dark);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:1px 5px;
+    font-size:11.5px;
+  }
+  .gc-watch{
+    font-size:12px !important;
+    color:var(--navy) !important;
+    font-style:italic;
+    margin:0 !important;
+  }
+
+  @media (max-width: 720px){
+    .guide-card{flex-direction:column; gap:4px;}
+    .gc-num{font-size:16px;}
+  }
+
+  footer{
+    max-width:1100px;
+    margin:28px auto 0;
+    padding:0 24px;
+    font-size:11px;
+    color:#5b5748;
+    line-height:1.6;
+    position:relative; z-index:1;
+  }
+  footer .redact{
+    background:var(--ink);
+    color:var(--ink);
+    padding:0 4px;
+    border-radius:2px;
+    user-select:none;
+  }
+
+  @media (max-width: 720px){
+    table, thead, tbody, tr, td{display:block;}
+    thead{display:none;}
+    tbody tr{
+      border:1px solid var(--line);
+      margin:10px;
+      padding:10px;
+      background:var(--paper-dark);
+    }
+    td{padding:4px 0;}
+    td.idx{
+      text-align:left;
+      font-size:16px;
+    }
+    td::before{
+      content:attr(data-label);
+      display:block;
+      font-family:'IBM Plex Sans Condensed', sans-serif;
+      font-size:9.5px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      color:#8a8367;
+      margin-bottom:2px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="case-tag">Working File · Threat Intel / IR Reference</div>
+  <h1>Patient Zero Investigation Matrix</h1>
+  <p class="subtitle">A sequenced process for tracing a breach back to its root-cause infection — from open-source recon you can run today, to internal correlation that requires standing authorization.</p>
+  <div class="meta-row">
+    <span><strong>Phases:</strong> 7</span>
+    <span><strong>Steps:</strong> 25</span>
+    <span><strong>Scope:</strong> Own org / authorized engagement only</span>
+  </div>
+</header>
+
+<div class="legend">
+  <span class="stamp green">✓ OSINT-Safe</span>
+  <span class="stamp red">⚠ Authorization Required</span>
+  <span class="legend-note">Every row below is tagged by which category it falls into — check before you run it.</span>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-phase="all">All Phases</div>
+  <div class="tab" data-phase="1">Phase 1 — External Recon</div>
+  <div class="tab" data-phase="2">Phase 2 — Internal Correlation</div>
+  <div class="tab" data-phase="3">Phase 3 — Attribution</div>
+  <div class="tab" data-phase="4">Phase 4 — Malware &amp; Infrastructure</div>
+  <div class="tab" data-phase="5">Phase 5 — Actor Intelligence</div>
+  <div class="tab" data-phase="6">Phase 6 — Validation &amp; Scoping</div>
+  <div class="tab" data-phase="7">Phase 7 — Post-Incident</div>
+  <div class="tab" data-phase="guide">★ Playbook</div>
+</div>
+
+<main>
+  <div class="board" id="matrixBoard">
+    <table id="matrix">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Step &amp; Objective</th>
+          <th>Tools</th>
+          <th>Data / Input Needed</th>
+          <th>Access Level</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr data-phase="1">
+          <td class="idx" data-label="Step">01</td>
+          <td class="step" data-label="Step">
+            <strong>Infostealer log search</strong>
+            <span class="desc">Check if any credentials tied to your domain surface in known stealer logs. Gives infection dates and malware family if present.</span>
+          </td>
+          <td class="tools" data-label="Tools">Hudson Rock Free Tools, SpyCloud, Flare, KELA</td>
+          <td data-label="Input">Company domain(s), key employee emails</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="1">
+          <td class="idx" data-label="Step">02</td>
+          <td class="step" data-label="Step">
+            <strong>External exposure sweep</strong>
+            <span class="desc">Inventory internet-facing services: open RDP, exposed admin panels, outdated banners.</span>
+          </td>
+          <td class="tools" data-label="Tools">Shodan, Censys<br><em>e.g. org:"Company Name"</em></td>
+          <td data-label="Input">Org name, IP ranges / ASN</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="1">
+          <td class="idx" data-label="Step">03</td>
+          <td class="step" data-label="Step">
+            <strong>Subdomain enumeration</strong>
+            <span class="desc">Surface forgotten dev/staging subdomains — classic patient-zero entry points.</span>
+          </td>
+          <td class="tools" data-label="Tools">crt.sh, SecurityTrails, Amass, theHarvester</td>
+          <td data-label="Input">Root domain</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="1">
+          <td class="idx" data-label="Step">04</td>
+          <td class="step" data-label="Step">
+            <strong>Dark web / forum monitoring</strong>
+            <span class="desc">Look for org mentions, access-for-sale listings, or leaked database samples.</span>
+          </td>
+          <td class="tools" data-label="Tools">Flare, KELA, Recorded Future, TGStat</td>
+          <td data-label="Input">Org name, domain, brand terms</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="2">
+          <td class="idx" data-label="Step">05</td>
+          <td class="step" data-label="Step">
+            <strong>Auth log correlation</strong>
+            <span class="desc">Match VPN/SSO logins for anomalous geography/ASN around the infection window from Step 01.</span>
+          </td>
+          <td class="tools" data-label="Tools">SIEM — Splunk, Sentinel, Chronicle</td>
+          <td data-label="Input">Candidate infection date range</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="2">
+          <td class="idx" data-label="Step">06</td>
+          <td class="step" data-label="Step">
+            <strong>EDR / AV history check</strong>
+            <span class="desc">Look for a missed or ignored stealer-family detection (Redline, Lumma, Vidar) near that date.</span>
+          </td>
+          <td class="tools" data-label="Tools">CrowdStrike, Defender, SentinelOne</td>
+          <td data-label="Input">Endpoint fleet history</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="2">
+          <td class="idx" data-label="Step">07</td>
+          <td class="step" data-label="Step">
+            <strong>Browser credential audit</strong>
+            <span class="desc">Flag which employees have admin-panel credentials saved in-browser — the exact exposure infostealers exploit.</span>
+          </td>
+          <td class="tools" data-label="Tools">MDM / endpoint management console</td>
+          <td data-label="Input">Device policy reports</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="2">
+          <td class="idx" data-label="Step">08</td>
+          <td class="step" data-label="Step">
+            <strong>Email gateway review</strong>
+            <span class="desc">Check for phishing or malicious attachments delivered to admin/dev accounts before the infection date.</span>
+          </td>
+          <td class="tools" data-label="Tools">Email security gateway logs</td>
+          <td data-label="Input">Mailbox list for suspected accounts</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="3">
+          <td class="idx" data-label="Step">09</td>
+          <td class="step" data-label="Step">
+            <strong>Identity cross-reference</strong>
+            <span class="desc">Match the flagged machine/user to role and access level via internal directory.</span>
+          </td>
+          <td class="tools" data-label="Tools">HRIS, Active Directory / IAM</td>
+          <td data-label="Input">Device owner, username</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="3">
+          <td class="idx" data-label="Step">10</td>
+          <td class="step" data-label="Step">
+            <strong>Password reuse verification</strong>
+            <span class="desc">Confirm the leaked credential still authenticates against the live admin panel — proves impact, not just possibility.</span>
+          </td>
+          <td class="tools" data-label="Tools">Manual test, within engagement scope only</td>
+          <td data-label="Input">Leaked credential, live system access</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires written scope</span></td>
+        </tr>
+
+        <tr data-phase="3">
+          <td class="idx" data-label="Step">11</td>
+          <td class="step" data-label="Step">
+            <strong>Timeline reconstruction</strong>
+            <span class="desc">Assemble infection → dormancy → first anomalous activity → public disclosure into a single case timeline.</span>
+          </td>
+          <td class="tools" data-label="Tools">Timeline / case management tool</td>
+          <td data-label="Input">Outputs of Steps 01–10</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Internal use</span></td>
+        </tr>
+
+        <tr data-phase="4">
+          <td class="idx" data-label="Step">12</td>
+          <td class="step" data-label="Step">
+            <strong>Sample analysis (static/dynamic)</strong>
+            <span class="desc">If the actual stealer binary is recovered, reverse-engineer it to confirm family, C2 endpoints, and exfil method rather than relying on the log alone.</span>
+          </td>
+          <td class="tools" data-label="Tools">Any.Run, Joe Sandbox, IDA / Ghidra</td>
+          <td data-label="Input">Recovered binary or sample hash</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="4">
+          <td class="idx" data-label="Step">13</td>
+          <td class="step" data-label="Step">
+            <strong>C2 / infrastructure pivoting</strong>
+            <span class="desc">Pivot on passive DNS, WHOIS history, and SSL cert reuse to find other victims sharing the attacker's infrastructure.</span>
+          </td>
+          <td class="tools" data-label="Tools">RiskIQ, Censys, SecurityTrails, VirusTotal Graph</td>
+          <td data-label="Input">C2 domain/IP from sample or log</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="4">
+          <td class="idx" data-label="Step">14</td>
+          <td class="step" data-label="Step">
+            <strong>IOC extraction &amp; sharing</strong>
+            <span class="desc">Format hashes, C2 domains, and IPs into a shareable structure and feed detection stack and sector ISACs.</span>
+          </td>
+          <td class="tools" data-label="Tools">MISP, STIX/TAXII</td>
+          <td data-label="Input">Confirmed IOCs from Steps 12–13</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">Internal-safe</span></td>
+        </tr>
+
+        <tr data-phase="4">
+          <td class="idx" data-label="Step">15</td>
+          <td class="step" data-label="Step">
+            <strong>Detection engineering</strong>
+            <span class="desc">Write YARA rules for the malware and Sigma rules for the log-based TTPs so recurrence gets caught automatically.</span>
+          </td>
+          <td class="tools" data-label="Tools">YARA, Sigma, SIEM rule engine</td>
+          <td data-label="Input">Sample &amp; behavior findings</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="5">
+          <td class="idx" data-label="Step">16</td>
+          <td class="step" data-label="Step">
+            <strong>Threat actor profiling</strong>
+            <span class="desc">Track the forum/Telegram handle's history: past victims, other active listings, reputation, and typical monetization pattern.</span>
+          </td>
+          <td class="tools" data-label="Tools">Forum monitoring, Recorded Future, KELA</td>
+          <td data-label="Input">Actor handle/alias from Step 04</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="5">
+          <td class="idx" data-label="Step">17</td>
+          <td class="step" data-label="Step">
+            <strong>Campaign correlation</strong>
+            <span class="desc">Check whether the same actor or stealer family has hit other organizations in your sector recently — often the fastest signal for predicting next moves.</span>
+          </td>
+          <td class="tools" data-label="Tools">ISAC bulletins, vendor threat reports</td>
+          <td data-label="Input">Stealer family, actor handle, sector</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="5">
+          <td class="idx" data-label="Step">18</td>
+          <td class="step" data-label="Step">
+            <strong>Extortion / negotiation monitoring</strong>
+            <span class="desc">If there's a ransom or extortion angle, track the actor's communication channel and demands as its own intelligence thread, separate from the technical root cause.</span>
+          </td>
+          <td class="tools" data-label="Tools">Secure comms monitoring, legal counsel loop-in</td>
+          <td data-label="Input">Actor contact channel</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Coordinate w/ legal</span></td>
+        </tr>
+
+        <tr data-phase="6">
+          <td class="idx" data-label="Step">19</td>
+          <td class="step" data-label="Step">
+            <strong>Leak authenticity verification</strong>
+            <span class="desc">Confirm the posted "sample" is real and current, not recycled from an older breach or partially fabricated to inflate credibility.</span>
+          </td>
+          <td class="tools" data-label="Tools">Manual data comparison against known records</td>
+          <td data-label="Input">Leaked sample, internal record set</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="6">
+          <td class="idx" data-label="Step">20</td>
+          <td class="step" data-label="Step">
+            <strong>Blast radius / third-party exposure</strong>
+            <span class="desc">Check whether vendors, contractors, or partners with access to the same systems are also compromised, or were the actual entry point.</span>
+          </td>
+          <td class="tools" data-label="Tools">Vendor access reviews, third-party risk platform</td>
+          <td data-label="Input">Vendor/contractor access list</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="6">
+          <td class="idx" data-label="Step">21</td>
+          <td class="step" data-label="Step">
+            <strong>Supply-chain check</strong>
+            <span class="desc">Determine if the infected machine was running pirated/cracked software or was an unmanaged personal (BYOD) device — changes both root cause and liability.</span>
+          </td>
+          <td class="tools" data-label="Tools">Endpoint software inventory, asset management</td>
+          <td data-label="Input">Infected device's software manifest</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="7">
+          <td class="idx" data-label="Step">22</td>
+          <td class="step" data-label="Step">
+            <strong>Rotation verification</strong>
+            <span class="desc">Confirm every credential found in the leak was actually rotated everywhere it was reused, not just on the system it was first found.</span>
+          </td>
+          <td class="tools" data-label="Tools">Password manager audit, IAM logs</td>
+          <td data-label="Input">Full list of exposed credentials</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Requires access</span></td>
+        </tr>
+
+        <tr data-phase="7">
+          <td class="idx" data-label="Step">23</td>
+          <td class="step" data-label="Step">
+            <strong>Continuous leak monitoring</strong>
+            <span class="desc">Watch for the stolen data resurfacing in credential-stuffing lists or new dumps months after the initial incident.</span>
+          </td>
+          <td class="tools" data-label="Tools">Hudson Rock, SpyCloud, HIBP alerts</td>
+          <td data-label="Input">Domain, exposed record set</td>
+          <td data-label="Access"><span class="auth-pill auth-osint">OSINT-safe</span></td>
+        </tr>
+
+        <tr data-phase="7">
+          <td class="idx" data-label="Step">24</td>
+          <td class="step" data-label="Step">
+            <strong>Regulatory / legal notification tracking</strong>
+            <span class="desc">Map breach-notification obligations that apply by jurisdiction and data type. Owned by legal/compliance, fed by TI findings.</span>
+          </td>
+          <td class="tools" data-label="Tools">Legal counsel, compliance tracker</td>
+          <td data-label="Input">Data types exposed, affected jurisdictions</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Legal-owned</span></td>
+        </tr>
+
+        <tr data-phase="7">
+          <td class="idx" data-label="Step">25</td>
+          <td class="step" data-label="Step">
+            <strong>Retrospective / control-gap analysis</strong>
+            <span class="desc">Formal lessons-learned tying the root cause to a specific missing control — e.g. no MFA on admin panel, no browser credential policy.</span>
+          </td>
+          <td class="tools" data-label="Tools">Post-incident review template</td>
+          <td data-label="Input">Full case timeline from Step 11</td>
+          <td data-label="Access"><span class="auth-pill auth-req">Internal use</span></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="board guide-board" id="guideBoard" style="display:none;">
+    <div class="guide-intro">
+      <p><strong>How to use this tab:</strong> for each step in the matrix, one primary tool is picked out and given a concrete, hands-on procedure — the query to run, what to look for, and what it feeds into next. Treat this as a starting playbook, not the only valid option.</p>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="1">Phase 1 — External Recon</div>
+
+    <div class="guide-card" data-gphase="1">
+      <div class="gc-num">01</div>
+      <div class="gc-body">
+        <div class="gc-title">Infostealer log search <span class="gc-tool">→ Hudson Rock (Cavalier Free Tools)</span></div>
+        <p>Go to <em>hudsonrock.com/free-tools</em> and run the "Cybercrime Intelligence Search" against your root domain and any key employee emails. The results table returns compromised machine entries tagged with infection date, malware family (Redline/Lumma/Vidar/etc.), and which of your URLs appeared in the saved-credential data.</p>
+        <p class="gc-watch">Watch for: any infection date that predates your known breach window — that's your dormancy period, and the machine behind it is your patient-zero candidate.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="1">
+      <div class="gc-num">02</div>
+      <div class="gc-body">
+        <div class="gc-title">External exposure sweep <span class="gc-tool">→ Shodan</span></div>
+        <p>Search <code>org:"Your Company Name"</code> or <code>hostname:yourdomain.com</code>, then narrow with <code>port:3389</code>, <code>port:3306</code>, or <code>http.title:"phpMyAdmin"</code>. Shodan's "Ports" and "Top Organizations" panels give you a quick inventory of what's actually reachable from the internet.</p>
+        <p class="gc-watch">Watch for: any admin panel, database port, or RDP service you didn't know was exposed — cross-check it against the subdomains from Step 03.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="1">
+      <div class="gc-num">03</div>
+      <div class="gc-body">
+        <div class="gc-title">Subdomain enumeration <span class="gc-tool">→ crt.sh</span></div>
+        <p>Query <code>crt.sh/?q=%.yourdomain.com</code>, export the unique Common Name / Subject Alternative Name entries, then resolve which are actually live with <code>httpx</code> or a quick DNS sweep.</p>
+        <p class="gc-watch">Watch for: dev/staging/legacy subdomains still resolving — these are the forgotten doors attackers find first (as with AFA's ezeiza subdomain).</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="1">
+      <div class="gc-num">04</div>
+      <div class="gc-body">
+        <div class="gc-title">Dark web / forum monitoring <span class="gc-tool">→ Flare</span></div>
+        <p>Set up a brand/domain monitor for your company name and domain. Flare's daily digest surfaces forum posts, Telegram messages, and paste-site hits automatically, so you don't manually browse criminal forums yourself.</p>
+        <p class="gc-watch">Watch for: "access for sale" listings naming your subdomains, or database sample posts — these usually appear before wider media coverage.</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="2">Phase 2 — Internal Correlation</div>
+
+    <div class="guide-card" data-gphase="2">
+      <div class="gc-num">05</div>
+      <div class="gc-body">
+        <div class="gc-title">Auth log correlation <span class="gc-tool">→ Splunk / Sentinel</span></div>
+        <p>Build a query filtering sign-in events to the date window around the Step 01 infection date, excluding known corporate IP ranges/ASNs. In Sentinel: <code>SigninLogs | where TimeGenerated between (start..end) | where Location != "expected"</code>.</p>
+        <p class="gc-watch">Watch for: a login from an unfamiliar ASN or country shortly after the infection date but before the public breach — that gap is your dwell time.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="2">
+      <div class="gc-num">06</div>
+      <div class="gc-body">
+        <div class="gc-title">EDR / AV history check <span class="gc-tool">→ CrowdStrike Falcon</span></div>
+        <p>In the Detections dashboard, filter by malware family name (Redline, Lumma, Vidar) and the date range from Step 01. Check each detection's disposition — many organizations have the alert but it was auto-resolved or never triaged.</p>
+        <p class="gc-watch">Watch for: a detection marked "resolved" with no follow-up ticket — that's usually the missed signal.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="2">
+      <div class="gc-num">07</div>
+      <div class="gc-body">
+        <div class="gc-title">Browser credential audit <span class="gc-tool">→ Intune / Jamf (MDM)</span></div>
+        <p>Pull the password-manager policy compliance report across managed devices. Cross-reference any device with browser-saved-password permissions enabled against your list of admin-panel URLs.</p>
+        <p class="gc-watch">Watch for: password reuse across multiple saved entries on the same device — a strong predictor of lateral admin access if that device is ever compromised.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="2">
+      <div class="gc-num">08</div>
+      <div class="gc-body">
+        <div class="gc-title">Email gateway review <span class="gc-tool">→ Proofpoint / Mimecast</span></div>
+        <p>Search inbound mail logs to the flagged account for the 2–3 weeks before the infection date, filtering for attachment types commonly used in stealer delivery: <code>.iso</code>, <code>.lnk</code>, <code>.js</code>, password-protected archives.</p>
+        <p class="gc-watch">Watch for: a single suspicious message that correlates tightly with the infection timestamp — that's your likely initial-access vector.</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="3">Phase 3 — Attribution</div>
+
+    <div class="guide-card" data-gphase="3">
+      <div class="gc-num">09</div>
+      <div class="gc-body">
+        <div class="gc-title">Identity cross-reference <span class="gc-tool">→ Entra ID / Active Directory</span></div>
+        <p>Look up the flagged username or device owner, and pull group memberships and role assignments directly from the directory.</p>
+        <p class="gc-watch">Watch for: an account with standing admin rights to more systems than its job function requires — a common root cause, independent of the infection itself.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="3">
+      <div class="gc-num">10</div>
+      <div class="gc-body">
+        <div class="gc-title">Password reuse verification <span class="gc-tool">→ Manual test, in-scope only</span></div>
+        <p>Only within a signed authorization/pentest scope, attempt the leaked credential against the live panel it was tied to. Document with a timestamped screenshot, then rotate the credential immediately after confirming.</p>
+        <p class="gc-watch">Watch for: this step is the only one on the matrix that touches a live production credential — never run it without written sign-off.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="3">
+      <div class="gc-num">11</div>
+      <div class="gc-body">
+        <div class="gc-title">Timeline reconstruction <span class="gc-tool">→ Spreadsheet / i2 Analyst's Notebook</span></div>
+        <p>Plot every dated event from Steps 01–10 on one timeline: infection → log detection → dormancy → first anomalous login → exfiltration → public disclosure.</p>
+        <p class="gc-watch">Watch for: the length of the dormancy gap — this is usually the single most persuasive number for justifying budget for continuous leak monitoring (Step 23).</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="4">Phase 4 — Malware &amp; Infrastructure</div>
+
+    <div class="guide-card" data-gphase="4">
+      <div class="gc-num">12</div>
+      <div class="gc-body">
+        <div class="gc-title">Sample analysis <span class="gc-tool">→ Any.Run</span></div>
+        <p>Upload the recovered binary to an interactive sandbox. Watch the network tab for C2 callbacks and the process tree for injection or persistence technique.</p>
+        <p class="gc-watch">Watch for: the C2 domain/IP — this feeds directly into Step 13's infrastructure pivot.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="4">
+      <div class="gc-num">13</div>
+      <div class="gc-body">
+        <div class="gc-title">C2 / infrastructure pivoting <span class="gc-tool">→ VirusTotal Graph</span></div>
+        <p>Pivot from the C2 IP/domain to shared SSL certificates, hosting providers, or historical WHOIS registrant data to surface other infrastructure tied to the same actor.</p>
+        <p class="gc-watch">Watch for: overlap with infrastructure named in other public breach reports — a strong campaign-correlation signal.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="4">
+      <div class="gc-num">14</div>
+      <div class="gc-body">
+        <div class="gc-title">IOC extraction &amp; sharing <span class="gc-tool">→ MISP</span></div>
+        <p>Create an event, attach hashes/domains/IPs as attributes, tag with a TLP marking, and publish to your internal detection stack or sector ISAC community.</p>
+        <p class="gc-watch">Watch for: attribute overlap with existing MISP events — may mean you're not the first victim of this exact infrastructure.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="4">
+      <div class="gc-num">15</div>
+      <div class="gc-body">
+        <div class="gc-title">Detection engineering <span class="gc-tool">→ YARA + Sigma</span></div>
+        <p>Write a YARA rule on unique strings/imports from the sample, and a Sigma rule on the log-based behavior pattern (e.g. bulk browser credential-file access). Deploy both to EDR/SIEM.</p>
+        <p class="gc-watch">Watch for: false-positive rate during a burn-in period before enabling blocking mode, not just alerting.</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="5">Phase 5 — Actor Intelligence</div>
+
+    <div class="guide-card" data-gphase="5">
+      <div class="gc-num">16</div>
+      <div class="gc-body">
+        <div class="gc-title">Threat actor profiling <span class="gc-tool">→ Recorded Future</span></div>
+        <p>Search the actor's forum/Telegram handle for post history, reputation score, and prior victims or listings.</p>
+        <p class="gc-watch">Watch for: a pattern of "sell access" vs "leak and shame" behavior — tells you what kind of monetization to expect next.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="5">
+      <div class="gc-num">17</div>
+      <div class="gc-body">
+        <div class="gc-title">Campaign correlation <span class="gc-tool">→ Sector ISAC bulletins</span></div>
+        <p>Search your sector's ISAC portal for the stealer family name plus your date range to see if peer organizations reported similar activity.</p>
+        <p class="gc-watch">Watch for: a cluster of same-family infections across your sector in the same month — suggests a coordinated or opportunistic campaign, not a targeted attack.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="5">
+      <div class="gc-num">18</div>
+      <div class="gc-body">
+        <div class="gc-title">Extortion / negotiation monitoring <span class="gc-tool">→ Legal-coordinated single channel</span></div>
+        <p>Designate one point of contact for any actor communication, log everything, and route all decisions through legal counsel before responding.</p>
+        <p class="gc-watch">Watch for: pressure tactics with a countdown or "proof of more data" — do not let this drive an unauthorized unilateral response.</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="6">Phase 6 — Validation &amp; Scoping</div>
+
+    <div class="guide-card" data-gphase="6">
+      <div class="gc-num">19</div>
+      <div class="gc-body">
+        <div class="gc-title">Leak authenticity verification <span class="gc-tool">→ Manual field-level diff</span></div>
+        <p>Compare the leaked sample's field names, hash formats, and record structure against your actual database schema and a few known internal records.</p>
+        <p class="gc-watch">Watch for: mismatched schema or stale records — a sign the actor is padding or recycling an older leak to look more credible.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="6">
+      <div class="gc-num">20</div>
+      <div class="gc-body">
+        <div class="gc-title">Blast radius / third-party exposure <span class="gc-tool">→ Vendor access review</span></div>
+        <p>Pull the list of vendor/contractor accounts with access to the affected system and check whether any of them share the same credential pattern.</p>
+        <p class="gc-watch">Watch for: a third party that turns out to be the actual entry point — common when a vendor's own device was the one infected.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="6">
+      <div class="gc-num">21</div>
+      <div class="gc-body">
+        <div class="gc-title">Supply-chain check <span class="gc-tool">→ Endpoint software inventory</span></div>
+        <p>Pull the installed-application list from the infected host via your EDR or asset management tool and check licensing/install source for each entry.</p>
+        <p class="gc-watch">Watch for: cracked/pirated software or unmanaged BYOD status — reshapes both the root-cause narrative and who's liable for remediation cost.</p>
+      </div>
+    </div>
+
+    <div class="guide-phase-head" data-gphase="7">Phase 7 — Post-Incident</div>
+
+    <div class="guide-card" data-gphase="7">
+      <div class="gc-num">22</div>
+      <div class="gc-body">
+        <div class="gc-title">Rotation verification <span class="gc-tool">→ IAM last-changed audit</span></div>
+        <p>Query IAM for the last-password-changed timestamp on every exposed account and confirm the change happened after the leak was discovered, everywhere the credential was reused.</p>
+        <p class="gc-watch">Watch for: a system that was missed in the first rotation pass — reused passwords rarely live in just one place.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="7">
+      <div class="gc-num">23</div>
+      <div class="gc-body">
+        <div class="gc-title">Continuous leak monitoring <span class="gc-tool">→ Hudson Rock / SpyCloud alerts</span></div>
+        <p>Set up a recurring scheduled scan (weekly is typical) on your domain, with automatic notification to the security team on any new hit.</p>
+        <p class="gc-watch">Watch for: this is the control that would have caught the original AFA-style dormancy period months earlier — treat it as a standing program, not a one-off check.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="7">
+      <div class="gc-num">24</div>
+      <div class="gc-body">
+        <div class="gc-title">Regulatory / legal notification tracking <span class="gc-tool">→ Legal counsel + compliance tracker</span></div>
+        <p>Map the exposed data types against applicable breach-notification laws (e.g. GDPR's 72-hour window, relevant state/national laws) together with legal.</p>
+        <p class="gc-watch">Watch for: notification clocks that start from discovery, not from confirmation — don't let technical validation delay the legal clock unnecessarily.</p>
+      </div>
+    </div>
+
+    <div class="guide-card" data-gphase="7">
+      <div class="gc-num">25</div>
+      <div class="gc-body">
+        <div class="gc-title">Retrospective / control-gap analysis <span class="gc-tool">→ Post-incident review template</span></div>
+        <p>Run a blameless lessons-learned session tying the root cause to one specific missing control (e.g. no MFA on the admin panel, no browser credential policy), with a named owner and remediation deadline.</p>
+        <p class="gc-watch">Watch for: vague action items with no owner — the most common reason the same root cause recurs at the next incident.</p>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  Steps 01–04 use only publicly available intelligence and are safe to run against your own organization at any time.
+  Steps 05–11 require standing IR authority or a written, scoped engagement — <span class="redact">do not run these against systems you don't own or aren't contracted to assess.</span>
+</footer>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const rows = document.querySelectorAll('#matrix tbody tr');
+  const matrixBoard = document.getElementById('matrixBoard');
+  const guideBoard = document.getElementById('guideBoard');
+  const guideHeads = document.querySelectorAll('.guide-phase-head');
+  const guideCards = document.querySelectorAll('.guide-card');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const phase = tab.dataset.phase;
+
+      if (phase === 'guide') {
+        matrixBoard.style.display = 'none';
+        guideBoard.style.display = 'block';
+        return;
+      }
+
+      matrixBoard.style.display = 'block';
+      guideBoard.style.display = 'none';
+
+      rows.forEach(row => {
+        row.style.display = (phase === 'all' || row.dataset.phase === phase) ? '' : 'none';
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

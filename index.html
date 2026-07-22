@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script>(function(){try{if(localStorage.getItem('theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
   <title>Peligey Rufus</title>
   <meta name="description" content="Digital Forensics & Incident Response Engineer — Portfolio, Articles, and Tools">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
@@ -41,13 +42,17 @@
   <nav class="nav" id="nav">
     <div class="nav-inner">
       <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
-      <ul class="nav-links" id="nav-links">
-        <li><a href="index.html" class="nav-link active">~/home</a></li>
-        <li><a href="articles.html" class="nav-link">~/articles</a></li>
-        <li><a href="tools.html" class="nav-link">~/tools</a></li>
-        <li><a href="#contact" class="nav-link">~/contact</a></li>
-      </ul>
-      <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+      <div class="nav-right">
+        <ul class="nav-links" id="nav-links">
+          <li><a href="index.html" class="nav-link active">~/home</a></li>
+          <li><a href="articles.html" class="nav-link">~/articles</a></li>
+          <li><a href="tools.html" class="nav-link">~/tools</a></li>
+          <li><a href="matrix.html" class="nav-link">~/matrix</a></li>
+          <li><a href="#contact" class="nav-link">~/contact</a></li>
+        </ul>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">☾</button>
+        <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
     </div>
   </nav>
 
@@ -96,17 +101,18 @@
       <div class="about-grid">
         <div class="about-text">
           <p>Digital forensics engineer with deep expertise in Windows and Linux artifact analysis, memory forensics, and enterprise-scale incident response. I've led investigations into ransomware, APT intrusions, insider threats, and everything in between.</p>
-          <p>When I'm not chasing threat actors through logs, I'm designing detection rules or building open-source DFIR tooling to help the community work faster and smarter.</p>
+          <p>When I'm not chasing threat actors through logs, I'm designing detection rules or building open-source DFIR tooling to help the community work faster and smarter. I also write — technical breakdowns on <a href="articles.html" style="color:var(--accent)">Field Notes</a>, Medium, and Infosecwriteups — because the artifact is only half the story until someone else can act on it.</p>
           <div class="skills-grid">
-            <div class="skill-group"><h4>Forensics</h4><ul><li>Volatility</li><li>CYLR</li><li>EZ Tools</li><li>Plaso / log2timeline</li></ul></div>
-            <div class="skill-group"><h4>Detection</h4><ul><li>Elastic SIEM</li><li>YARA / Sigma Rules</li><li>QuickSight</li><li>Vision One</li></ul></div>
-            <div class="skill-group"><h4>Development</h4><ul><li>Python</li><li>PowerShell</li><li>Bash</li><li>Git</li></ul></div>
+            <div class="skill-group"><h4>Forensics &amp; Collection</h4><ul><li>Volatility 3</li><li>CyLR (collection)</li><li>RECmd / Registry Explorer</li><li>MFTECmd &middot; PECmd &middot; AmcacheParser</li><li>IconCacheReader (own tool)</li></ul></div>
+            <div class="skill-group"><h4>Detection Engineering</h4><ul><li>Elastic / Kibana</li><li>Sigma Rule Development</li><li>MITRE ATT&amp;CK Mapping</li><li>Trend Micro Vision One (XDR)</li><li>QuickSuite Telemetry</li></ul></div>
+            <div class="skill-group"><h4>Development &amp; Cloud</h4><ul><li>Python</li><li>PowerShell</li><li>Bash</li><li>AWS &middot; Azure</li><li>Git</li></ul></div>
           </div>
         </div>
         <div class="timeline">
           <div class="timeline-item"><div class="tl-dot"></div><div class="tl-content"><span class="tl-date">2025 &mdash; Present</span><h3>DFIR Engineer</h3><p>TrendAI (Trend Micro) &middot; Incident response, proactive threat hunting, detection engineering, and enterprise breach assessments.</p></div></div>
           <div class="timeline-item"><div class="tl-dot"></div><div class="tl-content"><span class="tl-date">2024 &mdash; 2025</span><h3>First Response Engineer</h3><p>TrendAI (Trend Micro) &middot; Frontline DFIR, malware analysis, and incident containment for active enterprise compromises.</p></div></div>
           <div class="timeline-item"><div class="tl-dot"></div><div class="tl-content"><span class="tl-date">2022 &mdash; 2024</span><h3>Security Engineer</h3><p>TrendAI (Trend Micro) &middot; Threat mitigation, security solution deployment, system recovery, and client technical enablement.</p></div></div>
+          <div class="timeline-item"><div class="tl-dot"></div><div class="tl-content"><span class="tl-date">2021</span><h3>Intern, CPITS</h3><p>Trend Micro &middot; Linux &amp; AWS cloud training, hands-on with Deep Security and Apex One, attack-defense challenges.</p></div></div>
         </div>
       </div>
     </div>
@@ -152,30 +158,58 @@
       <div class="section-header"><span class="section-tag">// credentials</span><h2 class="section-title">Certifications</h2></div>
       <div class="certs-grid">
         <a class="cert-card" href="https://certs.ine.com/3f9195b1-3ca1-4908-8401-80ce9eeb4a72#acc.169KBAs8" target="_blank" rel="noopener">
-          <span class="cert-icon">&#127885;</span><span>eCMAP</span>
+          <span class="cert-icon">&#127891;</span><span>eCMAP</span>
           <span class="cert-sub">eLearnSecurity Certified Malware Analysis Professional</span>
           <span class="cert-verified">&#10003; Verify</span>
         </a>
         <a class="cert-card" href="https://www.credential.net/9fc55c32-8324-417e-b659-a74b1827260e#acc.uCmOaHRd" target="_blank" rel="noopener">
-          <span class="cert-icon">&#127885;</span><span>CRTP</span>
+          <span class="cert-icon">&#127891;</span><span>CRTP</span>
           <span class="cert-sub">Certified Red Team Professional</span>
           <span class="cert-verified">&#10003; Verify</span>
         </a>
         <a class="cert-card" href="https://certs.ine.com/37e99a91-5f9b-45bd-b789-4a2c76addbbf#acc.oB5jU2MH" target="_blank" rel="noopener">
-          <span class="cert-icon">&#127885;</span><span>eCPPT</span>
+          <span class="cert-icon">&#127891;</span><span>eCPPT</span>
           <span class="cert-sub">eLearnSecurity Certified Professional Penetration Tester</span>
           <span class="cert-verified">&#10003; Verify</span>
         </a>
         <a class="cert-card" href="https://www.credly.com/badges/5d71c611-4a09-457e-a794-61107fc4c8ed/linked_in_profile" target="_blank" rel="noopener">
-          <span class="cert-icon">&#127885;</span><span>BTL1</span>
+          <span class="cert-icon">&#127891;</span><span>BTL1</span>
           <span class="cert-sub">Blue Team Level 1</span>
           <span class="cert-verified">&#10003; Verify</span>
         </a>
         <a class="cert-card" href="https://assets.tryhackme.com/certification-certificate/67e9b819cc7b2310a364acba.pdf" target="_blank" rel="noopener">
-          <span class="cert-icon">&#127885;</span><span>SAL1</span>
+          <span class="cert-icon">&#127891;</span><span>SAL1</span>
           <span class="cert-sub">Security Analyst Level 1</span>
           <span class="cert-verified">&#10003; Verify</span>
         </a>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>AWS SAA</span>
+          <span class="cert-sub">AWS Certified Solutions Architect &ndash; Associate</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>AWS CCP</span>
+          <span class="cert-sub">AWS Certified Cloud Practitioner</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>AZ-500</span>
+          <span class="cert-sub">Microsoft Certified: Azure Security Engineer Associate</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>AZ-104</span>
+          <span class="cert-sub">Microsoft Certified: Azure Administrator Associate</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>Deep Security</span>
+          <span class="cert-sub">Trend Micro Deep Security 20 Certified Professional</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>Apex One</span>
+          <span class="cert-sub">Trend Micro Apex One as a Service Certified Professional</span>
+        </div>
+        <div class="cert-card">
+          <span class="cert-icon">&#127891;</span><span>Deep Discovery</span>
+          <span class="cert-sub">Trend Micro Deep Discovery ATD 3.3 Certified Professional</span>
+        </div>
       </div>
     </div>
   </section>

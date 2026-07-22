@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Active Directory — Attacks, Detection & Forensics Matrix</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e2e8f0; padding: 2rem; font-size: 13px; line-height: 1.5; }
+  h1 { font-size: 20px; font-weight: 600; color: #f8fafc; margin-bottom: 0.25rem; }
+  .subtitle { font-size: 12px; color: #64748b; margin-bottom: 2.5rem; }
+  .arch-note { font-size: 11px; color: #475569; background: #161b27; border: 1px solid #1e293b; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 2rem; line-height: 1.7; }
+  .arch-note strong { color: #94a3b8; }
+  .arch-note code { font-family: 'Courier New', monospace; font-size: 10.5px; color: #7dd3fc; background: #0d1520; padding: 1px 4px; border-radius: 3px; }
+  .section { margin-bottom: 2.5rem; }
+  .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #475569; margin-bottom: 0.6rem; padding-bottom: 0.4rem; border-bottom: 1px solid #1e293b; }
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #1e293b; }
+  table { width: 100%; border-collapse: collapse; min-width: 900px; }
+  thead tr { background: #161b27; }
+  thead th { padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; white-space: nowrap; border-bottom: 1px solid #1e293b; }
+  tbody tr { border-bottom: 1px solid #1a2030; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #141923; }
+  td { padding: 9px 12px; vertical-align: top; color: #cbd5e1; font-size: 12px; }
+  td:first-child { font-weight: 600; color: #e2e8f0; min-width: 180px; }
+  td.mono { font-family: 'Courier New', monospace; font-size: 10.5px; color: #7dd3fc; }
+  td.caveat { color: #64748b; font-size: 11px; }
+  td.ioc { color: #fca5a5; font-size: 11px; }
+  td.detect { color: #86efac; font-size: 11px; }
+  td.mitigate { color: #93c5fd; font-size: 11px; }
+  .yes { color: #4ade80; font-weight: 600; }
+  .no  { color: #f87171; font-weight: 600; }
+  .part { color: #fbbf24; font-weight: 600; }
+  .tag { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+  .tag-cred   { background: #1e3a5f; color: #60a5fa; }
+  .tag-kerb   { background: #2a1f3d; color: #a78bfa; }
+  .tag-recon  { background: #14361f; color: #4ade80; }
+  .tag-persist{ background: #3b2000; color: #fbbf24; }
+  .tag-lateral{ background: #1a2d3a; color: #7dd3fc; }
+  .tag-privesc{ background: #3b1a1a; color: #fca5a5; }
+  .tag-pki    { background: #1e3028; color: #6ee7b7; }
+  .eid { display: inline-block; font-family: 'Courier New', monospace; font-size: 10px; background: #1e293b; color: #f8fafc; padding: 1px 5px; border-radius: 3px; margin: 1px 2px; white-space: nowrap; }
+  .guid { font-family: 'Courier New', monospace; font-size: 10px; color: #7dd3fc; }
+  footer { font-size: 11px; color: #334155; margin-top: 2rem; border-top: 1px solid #1e293b; padding-top: 1rem; }
+</style>
+</head>
+<body>
+
+<h1>Active Directory — Attacks, Detection &amp; Forensics Matrix</h1>
+<p class="subtitle">Attack mechanics, detection event IDs, forensic artefacts, IOCs, and mitigations for common AD attack techniques.</p>
+
+<div class="arch-note">
+  <strong>Audit policy prerequisites:</strong> Many detection event IDs require non-default audit policy configuration on Domain Controllers. Key policies to enable: <em>Audit Directory Service Access</em> (for EID 4662, 4661), <em>Audit Account Logon</em> (for EID 4768, 4769, 4771, 4776), <em>Audit Logon Events</em> (4624, 4625, 4648), <em>Audit Process Creation</em> with command line logging (4688), and <em>DS Access auditing</em> (5136, 5137, 4929). Without these enabled, the listed event IDs will not be generated. All DC logs should be collected and retained centrally — attackers routinely clear local Security.evtx.<br><br>
+  <strong>Log locations on DC:</strong> <code>C:\Windows\System32\winevt\Logs\Security.evtx</code> (primary), <code>Microsoft-Windows-ActiveDirectory_DomainService%4Diagnostic.evtx</code> (DS diagnostics), <code>System.evtx</code>. NTDS.dit: <code>C:\Windows\NTDS\ntds.dit</code> + <code>SYSTEM</code> hive required for decryption.
+</div>
+
+<!-- ── RECONNAISSANCE ────────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Reconnaissance — User, Domain &amp; SPN Enumeration</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>User/Domain recon (net, nltest, PowerView) <span class="tag tag-recon">recon</span></td>
+        <td>Attacker enumerates domain users, groups, OUs, trusts, and DCs using built-in tools (net.exe, nltest.exe, dsquery.exe) or PowerShell (PowerView, ADModule).</td>
+        <td class="detect">
+          <span class="eid">4661</span> — SAM/LSA handle opened (high volume on DC)<br>
+          <span class="eid">4688</span> — process creation: net.exe, nltest.exe, dsquery.exe, AdFind.exe<br>
+          <span class="eid">4103/4104</span> — PS module/script block logging: Get-ADUser, Get-DomainUser, Invoke-UserHunter
+        </td>
+        <td class="ioc">Burst of net.exe/nltest.exe executions from workstation. PowerShell querying AD via ADSI or Get-ADUser. AdFind.exe execution. LDAP queries to port 389/636 from non-admin workstation at unusual hours.</td>
+        <td class="mono">Security.evtx (DC)<br>PowerShell/Operational.evtx<br>Network LDAP traffic</td>
+        <td class="mitigate">Enable process creation logging + command line. Monitor LDAP query volume per source. Restrict LDAP enumeration — require authentication. Deploy honeypot accounts that should never be queried.</td>
+      </tr>
+      <tr>
+        <td>SPN enumeration (Kerberoast prerecon) <span class="tag tag-recon">recon</span></td>
+        <td>Attacker queries AD for accounts with SPNs registered — identifies Kerberoasting targets. Tools: setspn.exe, PowerView Get-DomainUser -SPN, Rubeus.exe.</td>
+        <td class="detect">
+          <span class="eid">4688</span> — setspn.exe execution<br>
+          <span class="eid">4104</span> — PowerShell: Get-DomainUser -SPN, Get-ADUser -Filter {ServicePrincipalName -ne "$null"}<br>
+          <span class="eid">4769</span> — subsequent service ticket requests (Kerberoasting follows)
+        </td>
+        <td class="ioc">setspn.exe -Q */* from non-admin workstation. LDAP filter query for servicePrincipalName=* from unusual source. Followed closely by burst of EID 4769 RC4 ticket requests.</td>
+        <td class="mono">Security.evtx (DC)<br>PowerShell/Operational.evtx</td>
+        <td class="mitigate">Use Managed Service Accounts (MSA/gMSA) — no user-format SPNs with crackable passwords. Monitor setspn.exe execution. Canary SPN account that should never have a ticket requested.</td>
+      </tr>
+      <tr>
+        <td>BloodHound / SharpHound collection <span class="tag tag-recon">recon</span></td>
+        <td>Automated AD graph collection — enumerates all users, groups, GPOs, ACLs, sessions, and delegation paths to find attack paths to Domain Admin. Generates high-volume LDAP queries and SMB session enumeration.</td>
+        <td class="detect">
+          <span class="eid">4688</span> — SharpHound.exe / SharpHound.ps1 process creation<br>
+          <span class="eid">4624</span> Type 3 — burst of SMB logons to enumerate sessions<br>
+          <span class="eid">4104</span> — Invoke-BloodHound, Get-BloodHoundData
+        </td>
+        <td class="ioc">High-volume LDAP queries in short window from single source. Simultaneous SMB connections to many hosts for session enumeration. SharpHound binary name in Prefetch/AmCache. Output files: BloodHound*.zip, *.json in temp directories.</td>
+        <td class="mono">Security.evtx (DC &amp; hosts)<br>Network LDAP telemetry<br>EDR process telemetry</td>
+        <td class="mitigate">Enable LDAP query logging (diagnostic level 5). Monitor for volume LDAP enumeration. Rename default SharpHound — but attackers rename it too. Restrict SMB session enumeration via Group Policy.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── CREDENTIAL ATTACKS ────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Credential Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Password Spraying <span class="tag tag-cred">credential</span></td>
+        <td>Attacker tries one or a few common passwords across many accounts — avoids lockout thresholds. Works against NTLM (port 445) and Kerberos (AS-REQ with wrong password).</td>
+        <td class="detect">
+          <span class="eid">4625</span> — failed logon, Sub Status 0xC000006A (wrong password) across multiple accounts<br>
+          <span class="eid">4771</span> — Kerberos pre-auth failed across multiple accounts from same IP<br>
+          <span class="eid">4776</span> — NTLM credential validation failure<br>
+          Spray pattern: many accounts, same timestamp window, same source IP
+        </td>
+        <td class="ioc">Many EID 4625/4771 failures across different usernames from one source IP within minutes. Low failure-per-account count (stays under lockout threshold). Followed by EID 4624 success for one account.</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Fine-grained password policies. Azure AD Smart Lockout. Enforce MFA. Monitor for distributed spray (same password, many accounts, varied source IPs). Entra ID Password Protection for on-prem.</td>
+      </tr>
+      <tr>
+        <td>GPP Passwords (MS14-025) <span class="tag tag-cred">credential</span></td>
+        <td>Group Policy Preferences XML files (Groups.xml, ScheduledTasks.xml, Services.xml) stored in SYSVOL can contain AES-256 encrypted passwords — but Microsoft published the static decryption key in 2012. Any authenticated domain user can read SYSVOL and decrypt the cPassword field.</td>
+        <td class="detect">
+          <span class="eid">4688</span> — gpp-decrypt, Get-GPPPassword execution<br>
+          <span class="eid">5140</span> — SYSVOL share access from unexpected host<br>
+          <span class="eid">4104</span> — PowerShell: Get-GPPPassword, Find-GPOComputerAdmin
+        </td>
+        <td class="ioc">Access to <code>\\domain\SYSVOL\*\Policies\*\Groups.xml</code> or similar GPP files from non-admin workstations. cPassword field present in any GPP XML file (should have been removed).</td>
+        <td class="mono">Security.evtx (DC)<br>SYSVOL file access logs</td>
+        <td class="mitigate">Run Microsoft KB2962486 to remove cPassword fields. Audit SYSVOL for remaining GPP XML files with cPassword. PowerSploit Get-GPPPassword — run yourself first to find and remediate.</td>
+      </tr>
+      <tr>
+        <td>Credentials in Shares / Object Properties <span class="tag tag-cred">credential</span></td>
+        <td>Passwords stored in SMB share files (scripts, config files, wiki pages) or in AD object attributes (Description field, info field, comment) in cleartext. Readable by any authenticated user.</td>
+        <td class="detect">
+          <span class="eid">5140 / 5145</span> — file share access and enumeration<br>
+          <span class="eid">4662</span> — AD object attribute read (requires SACL)<br>
+          <span class="eid">4688</span> — findstr, Select-String, Snaffler.exe execution
+        </td>
+        <td class="ioc">Snaffler.exe or similar share-spider execution. findstr /si password *.txt in Sysmon/4688 process creation. Bulk LDAP reads of user Description fields. Password-like strings in AD Description attributes.</td>
+        <td class="mono">Security.evtx<br>File server access logs</td>
+        <td class="mitigate">Audit AD user Description/comment fields for passwords. Restrict authenticated-user read on sensitive shares. Run Snaffler/DeHashed against your own environment proactively.</td>
+      </tr>
+      <tr>
+        <td>Pass-the-Hash (PTH) <span class="tag tag-cred">credential</span></td>
+        <td>Attacker authenticates using a stolen NTLM hash without knowing the plaintext password. Hash extracted from LSASS memory (Mimikatz sekurlsa::logonpasswords) or SAM/NTDS.dit. Used for lateral movement over SMB/WMI/DCOM.</td>
+        <td class="detect">
+          <span class="eid">4624</span> Type 3 — logon with NtLmSsp authentication package (no Kerberos TGT precedes it)<br>
+          <span class="eid">4648</span> — explicit credential use<br>
+          <span class="eid">4776</span> — NTLM auth from unexpected host<br>
+          No preceding <span class="eid">4768</span> for the same account = PTH indicator
+        </td>
+        <td class="ioc">Type 3 logon + NTLM + no prior 4768 for same account. Multiple lateral Type 3 logons from single source in short window. LSASS access (Sysmon EID 10) prior to network logons. Logon from host that account never previously used.</td>
+        <td class="mono">Security.evtx (source &amp; destination DC)</td>
+        <td class="mitigate">Enable Credential Guard. Disable NTLMv1. Enable SMB signing. Tiered admin model — no admin accounts on workstations. Restrict NTLM where Kerberos is available. Monitor Sysmon EID 10 on lsass.exe.</td>
+      </tr>
+      <tr>
+        <td>Pass-the-Ticket (PTT) <span class="tag tag-kerb">kerberos</span></td>
+        <td>Attacker injects a stolen Kerberos TGT or service ticket into their own session using Mimikatz kerberos::ptt or Rubeus ptt. Ticket stolen from LSASS memory of another session. Allows access to resources as the ticket owner without their credentials.</td>
+        <td class="detect">
+          <span class="eid">4768</span> — TGT issued on DC<br>
+          <span class="eid">4769</span> — service ticket requested<br>
+          <span class="eid">4624</span> Type 9 (NewCredentials) — injected ticket logon<br>
+          Ticket use from IP/host mismatching the original ticket issuance host
+        </td>
+        <td class="ioc">TGT used from different IP than where it was issued. Service ticket requested without corresponding TGT request. EID 4624 Type 9 logon (createprocesswithlogon / runas). Memory access to lsass.exe (Sysmon EID 10) preceding ticket use.</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Credential Guard prevents LSASS ticket theft. Short Kerberos ticket lifetime (default 10 hours — do not extend). Monitor Sysmon EID 10 on lsass.exe. Restrict who can read tickets from LSASS.</td>
+      </tr>
+      <tr>
+        <td>Overpass-the-Hash (OPtH) <span class="tag tag-kerb">kerberos</span></td>
+        <td>Uses a stolen NTLM hash to request a Kerberos TGT — converts the hash into a fully functional Kerberos ticket. Executed via Mimikatz sekurlsa::pth or Rubeus asktgt /rc4. Produces a TGT that can be used like a normal Kerberos session — avoids NTLM detection.</td>
+        <td class="detect">
+          <span class="eid">4768</span> — TGT request using RC4 encryption (etype 23 = 0x17) instead of AES — anomalous if AES should be used<br>
+          <span class="eid">4624</span> Type 9 — new credentials logon type<br>
+          <span class="eid">4688</span> — Mimikatz / Rubeus process creation
+        </td>
+        <td class="ioc">AS-REQ using RC4 (etype 0x17) for account that normally uses AES. EID 4768 from host that account does not normally log into. Type 9 logon immediately followed by Kerberos-authenticated activity (bypassing normal Type 2 interactive logon).</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Enforce AES-only Kerberos (disable RC4/DES). Credential Guard. Monitor for RC4 TGT requests from accounts that have AES keys available. Alert on Type 9 logons from privileged accounts.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── KERBEROS ATTACKS ──────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Kerberos Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Kerberoasting <span class="tag tag-kerb">kerberos</span></td>
+        <td>Any authenticated domain user can request a Kerberos service ticket (TGS) for any SPN. The ticket is encrypted with the service account's NTLM hash. Attacker requests ticket offline, extracts hash, and cracks it. No elevated privileges required.</td>
+        <td class="detect">
+          <span class="eid">4769</span> — service ticket requested with RC4 encryption type (0x17) — AES-capable accounts should never use RC4<br>
+          Burst of 4769 RC4 requests across multiple service accounts from single source<br>
+          <span class="eid">4688</span> — Rubeus.exe, Invoke-Kerberoast, GetUserSPNs.py
+        </td>
+        <td class="ioc">Multiple EID 4769 RC4 requests in short window from one host. Service ticket requests for rarely-used service accounts. Ticket Options value 0x40810000 (common Kerberoasting tool flag). Rubeus/Invoke-Kerberoast in process/PS logs.</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Use gMSA — auto-rotating 240-char passwords, not crackable. Enforce AES-only (disable RC4) — cracks become infeasible. Audit SPNs on user accounts. Monitor 4769 RC4 requests. Set canary SPN account that should never be requested.</td>
+      </tr>
+      <tr>
+        <td>AS-REProasting <span class="tag tag-kerb">kerberos</span></td>
+        <td>Accounts with DONT_REQ_PREAUTH (UF 0x400000) set do not require Kerberos pre-authentication. Attacker sends AS-REQ for these accounts without any credentials — DC returns AS-REP encrypted with the account's hash. Attacker cracks offline. Requires zero authentication.</td>
+        <td class="detect">
+          <span class="eid">4768</span> — AS-REQ with no pre-authentication (PreAuthType = 0) for accounts that have pre-auth disabled<br>
+          <span class="eid">4625</span> — failed pre-auth if account does require it (failed roasting attempt)<br>
+          <span class="eid">4688</span> — Rubeus.exe asreproast, GetNPUsers.py
+        </td>
+        <td class="ioc">EID 4768 with Pre-Authentication Type 0 and RC4 encryption from unexpected source. Multiple AS-REQs for different accounts from same IP without corresponding logon activity. DONT_REQ_PREAUTH set on any account (should be rare/never).</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Audit and disable DONT_REQ_PREAUTH on all accounts — it should never be set without documented business need. Strong passwords on affected accounts. Monitor EID 4768 PreAuthType=0.</td>
+      </tr>
+      <tr>
+        <td>Golden Ticket <span class="tag tag-kerb">kerberos</span></td>
+        <td>Attacker forges a TGT using the krbtgt account's NTLM hash (obtained via DCSync or NTDS.dit dump). Forged TGT is cryptographically valid from the DC's perspective — bypasses all normal authentication checks. Can impersonate any user with any group membership. Survives password resets (krbtgt must be reset TWICE).</td>
+        <td class="detect">
+          <span class="eid">4769</span> — service ticket requested using a TGT that has no corresponding <span class="eid">4768</span> on the DC<br>
+          <span class="eid">4672</span> — special privileges assigned at logon with forged ticket<br>
+          Ticket lifetime anomaly: default 10hrs — forged tickets often set to 10 years<br>
+          <span class="eid">4624</span> — logon event where ticket domain differs from account domain
+        </td>
+        <td class="ioc">4769 with no preceding 4768 for same account. Ticket lifetime &gt;10 hours (forged tickets default to 10 years in Mimikatz). Account claiming membership in groups it does not belong to (e.g. RID 519 Enterprise Admins for non-EA account). Domain field in 4624 is FQDN rather than NETBIOS (Mimikatz default).</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Rotate krbtgt password TWICE (10+ hours apart) to invalidate all existing TGTs. Enable Protected Users group for privileged accounts. Monitor 4769 without preceding 4768. Defender for Identity Golden Ticket detection. krbtgt rotation after any suspected DC compromise.</td>
+      </tr>
+      <tr>
+        <td>Silver Ticket <span class="tag tag-kerb">kerberos</span></td>
+        <td>Attacker forges a service ticket (TGS) using the target service account's NTLM hash — without touching the DC or KDC. Grants access directly to a specific service (e.g. CIFS, HOST, MSSQLSvc). Leaves NO KDC log entries — the DC is never contacted.</td>
+        <td class="detect">
+          No DC event logs generated — Silver Ticket bypasses the KDC entirely<br>
+          <span class="eid">4624</span> on the target service host — logon with Kerberos but no DC authentication record<br>
+          <span class="eid">4634</span> — logoff shortly after with no corresponding DC activity<br>
+          Network: Kerberos AP-REQ directly to service with no AS-REQ/TGS-REQ to DC
+        </td>
+        <td class="ioc">Service authentication with no corresponding DC ticket issuance. Account using Kerberos to access service it has never accessed before. PAC validation disabled (Silver Tickets often have invalid PAC). Network sensor: Kerberos AP-REQ without preceding TGS exchange to DC.</td>
+        <td class="mono">Security.evtx (target host)<br>Network Kerberos traffic</td>
+        <td class="mitigate">Enable PAC validation (KDC PAC validation — requires registry key on services). Strong, rotating service account passwords. Credential Guard. Defender for Identity Silver Ticket detection via PAC inspection.</td>
+      </tr>
+      <tr>
+        <td>Kerberos Constrained Delegation (KCD) abuse <span class="tag tag-kerb">kerberos</span></td>
+        <td>Accounts/computers with constrained delegation (msDS-AllowedToDelegateTo) can request service tickets on behalf of any user to specific services. If the account is compromised, attacker can impersonate any domain user (including DA) to the allowed services using S4U2Proxy. Protocol transition (S4U2Self) allows impersonation without requiring the victim's ticket.</td>
+        <td class="detect">
+          <span class="eid">4769</span> — S4U2Proxy service ticket requests where Transited-Services field is populated<br>
+          <span class="eid">4769</span> — S4U2Self ticket request (service requesting ticket for another user to itself)<br>
+          <span class="eid">4688</span> — Rubeus.exe s4u, getST.py
+        </td>
+        <td class="ioc">4769 with Transited-Services field containing unexpected accounts. Service ticket for high-privilege user (DA, EA) requested via S4U from a service account. Delegation to sensitive services (CIFS on DC, LDAP on DC). Rubeus s4u syntax in process logs.</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Mark sensitive accounts as "Account is sensitive and cannot be delegated." Add DAs to Protected Users group. Audit msDS-AllowedToDelegateTo attributes. Prefer Resource-Based Constrained Delegation (RBCD) over classic KCD. Never configure delegation to DC services.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── DOMAIN CONTROLLER ATTACKS ─────────────────────────── -->
+<div class="section">
+  <div class="section-label">Domain Controller Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>DCSync <span class="tag tag-privesc">priv esc</span></td>
+        <td>Attacker with DS-Replication-Get-Changes-All rights impersonates a DC and uses the DRSUAPI protocol to request replication of credential data — including NTLM hashes and Kerberos keys for all accounts including krbtgt. Does not require local access to the DC. Tool: Mimikatz lsadump::dcsync.</td>
+        <td class="detect">
+          <span class="eid">4662</span> — directory object access with properties:<br>
+          &nbsp;&nbsp;<span class="guid">{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}</span> DS-Replication-Get-Changes<br>
+          &nbsp;&nbsp;<span class="guid">{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}</span> DS-Replication-Get-Changes-All<br>
+          &nbsp;&nbsp;<span class="guid">{89e95b76-444d-4c62-991a-0facbeda640c}</span> DS-Replication-Get-Changes-In-Filtered-Set<br>
+          Access_Mask: 0x100. SubjectUserName must NOT be a DC computer account ($)<br>
+          Link 4662 LogonId → <span class="eid">4624</span> to identify source IP of the replication request
+        </td>
+        <td class="ioc">EID 4662 with replication GUIDs from a user account (not a DC computer account$). Burst of 24+ consecutive 4662 replication events within milliseconds. DRSUAPI traffic from non-DC IP. Mimikatz lsadump::dcsync in process/PS logs.</td>
+        <td class="mono">Security.evtx (DC)<br>Network (DRSUAPI port 49152+)</td>
+        <td class="mitigate">Audit and restrict DS-Replication-Get-Changes-All rights — only DC computer accounts should have this. Enable DS Access auditing (disabled by default). Defender for Identity DCSync detection. Monitor replication rights via: <code>Get-ADObject (Get-ADDomain).DistinguishedName -Properties * | Select nTSecurityDescriptor</code>.</td>
+      </tr>
+      <tr>
+        <td>DCShadow <span class="tag tag-persist">persistence</span></td>
+        <td>Attacker with DA privileges registers a rogue DC in AD (by creating nTDSDSA and Server objects and registering fake SPNs) then pushes malicious AD changes via replication — bypassing audit logs on the legitimate DC. Changes include adding users to groups, modifying ACLs, or inserting persistence. Tool: Mimikatz lsadump::dcshadow.</td>
+        <td class="detect">
+          <span class="eid">4929</span> — replication source naming context removed (rogue DC cleanup)<br>
+          <span class="eid">5137</span> — new directory service object created (nTDSDSA object for rogue DC)<br>
+          <span class="eid">4662</span> — replication rights exercised by unexpected account<br>
+          <span class="eid">4688</span> — Mimikatz dcshadow execution<br>
+          <code>repadmin /showchanges</code> — unexpected replication partner appears
+        </td>
+        <td class="ioc">New nTDSDSA or Server object created in Sites &amp; Services outside change window. Unexpected server in replication topology (repadmin /showrepl). EID 4929 for a DC that was never legitimate. SPN registered matching DC pattern from non-DC machine. AD changes with no corresponding audit trail on known DCs.</td>
+        <td class="mono">Security.evtx (DC)<br>AD Replication metadata<br>Directory Services log</td>
+        <td class="mitigate">Monitor nTDSDSA object creation (EID 5137). Audit AD replication topology changes. Defender for Identity DCShadow detection. Restrict who can register DC-like SPNs. Use <code>repadmin /showrepl</code> regularly to baseline legitimate replication partners.</td>
+      </tr>
+      <tr>
+        <td>NTDS.dit extraction <span class="tag tag-cred">credential</span></td>
+        <td>The NTDS.dit file on the DC contains all AD credential data. Extracted offline via VSS shadow copy (ntdsutil, vssadmin), remote registry, or by copying from a VSS snapshot. Requires decryption using the SYSTEM hive's bootkey. Tools: secretsdump.py, ntdsutil, DSInternals.</td>
+        <td class="detect">
+          <span class="eid">4688</span> — ntdsutil.exe, vssadmin.exe, diskshadow.exe, esentutl.exe execution on DC<br>
+          <span class="eid">7036</span> — Volume Shadow Copy Service started (on DC outside backup window)<br>
+          <span class="eid">8222</span> — VSS snapshot created<br>
+          <span class="eid">4656/4663</span> — NTDS.dit file access (if auditing enabled on file)
+        </td>
+        <td class="ioc">ntdsutil "activate instance ntds" "ifm" "create full C:\temp" syntax in 4688. vssadmin create shadow on DC outside scheduled backup. esentutl.exe /p on NTDS.dit. SYSTEM hive copied alongside NTDS.dit. Large file created in temp directory on DC.</td>
+        <td class="mono">Security.evtx (DC)<br>System.evtx (DC)</td>
+        <td class="mitigate">Alert on ntdsutil IFM creation outside approved backup process. Monitor VSS creation on DCs. Restrict local admin on DCs to Tier 0 accounts only. Enable file system auditing on C:\Windows\NTDS\. Use PAM/JIT for DC access.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── COERCION & RELAY ───────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Coercion &amp; NTLM Relay Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Print Spooler coercion (MS-RPRN) <span class="tag tag-lateral">lateral</span></td>
+        <td>The Print Spooler service (spoolsv.exe) exposes an RPC method (RpcRemoteFindFirstPrinterChangeNotificationEx, opnum 65) that forces the target host to authenticate to an attacker-specified UNC path. The resulting NetNTLM hash can be captured (Responder) or relayed (ntlmrelayx). Any authenticated domain user can trigger this. Tool: SpoolSample, printerbug.py.</td>
+        <td class="detect">
+          <span class="eid">4688</span> — spoolsv.exe making outbound connection (unusual parent-child)<br>
+          <span class="eid">4624</span> Type 3 on attacker's relay target (NTLM relay success)<br>
+          <span class="eid">4648</span> — explicit credential use during relay<br>
+          Network: MS-RPRN RPC call from attacker workstation to victim, followed by SMB auth to attacker
+        </td>
+        <td class="ioc">spoolsv.exe initiating outbound SMB connection to non-DC/non-print-server host. NTLM authentication event on attacker-controlled host from DC machine account. NetNTLMv2 hash in network capture. DC machine account authenticating to workstation (reversed auth direction).</td>
+        <td class="mono">Security.evtx<br>Network SMB/RPC traffic<br>Sysmon (network connections)</td>
+        <td class="mitigate">Disable Print Spooler on all DCs and servers that do not print (<code>Stop-Service Spooler; Set-Service Spooler -StartupType Disabled</code>). Enable SMB signing on all hosts. Enable LDAP signing + channel binding. Require EPA for NTLM. KB5005010 (disable Spooler on DCs).</td>
+      </tr>
+      <tr>
+        <td>Coercing attacks (PetitPotam, DFSCoerce, Coercer) <span class="tag tag-lateral">lateral</span></td>
+        <td>Multiple Windows protocols (MS-EFSRPC via PetitPotam, MS-DFSNM via DFSCoerce, MS-FSRVP, MS-RPRN) can be abused to force machine account authentication to an attacker-controlled host. Often combined with NTLM relay to ADCS web enrollment (ESC8) or LDAP for RBCD.</td>
+        <td class="detect">
+          <span class="eid">4624</span> Type 3 on target relay host from DC/server machine account<br>
+          <span class="eid">4688</span> — PetitPotam.py, Coercer.py, DFSCoerce.py execution<br>
+          Network: EfsRpcOpenFileRaw or NetrDfsRemoveStandaloneRoot calls from unexpected source<br>
+          <span class="eid">4769</span> — DC machine account Kerberos activity after RBCD relay
+        </td>
+        <td class="ioc">DC machine account (DC$) authenticating to non-DC host. EFSRPC calls from hosts that do not use EFS. MS-DFSNM or MS-FSRVP calls from non-DFS infrastructure. New msDS-AllowedToActOnBehalfOfOtherIdentity attribute set on DC object (RBCD relay result).</td>
+        <td class="mono">Security.evtx<br>Network protocol telemetry</td>
+        <td class="mitigate">Enable EPA (Extended Protection for Authentication) on IIS/ADCS. Enable LDAP signing and channel binding. KB5005413 (PetitPotam fix for unauthenticated EFS). Disable unnecessary RPC endpoints. Monitor new RBCD attribute writes (EID 5136 on DC object).</td>
+      </tr>
+      <tr>
+        <td>Responder / LLMNR-NBT-NS poisoning <span class="tag tag-lateral">lateral</span></td>
+        <td>Responder listens for LLMNR, NBT-NS, and MDNS broadcast queries (used when DNS fails) and responds with attacker's IP — causing target to authenticate to attacker. Captures NetNTLMv2 hashes for offline cracking or relay. Requires no privileges.</td>
+        <td class="detect">
+          <span class="eid">4648</span> — explicit credential use from victim to attacker IP<br>
+          <span class="eid">4776</span> — NTLM auth attempt to an unexpected host<br>
+          Network: LLMNR/NBT-NS response from unexpected host. Multiple NTLMv2 challenges to attacker IP.
+        </td>
+        <td class="ioc">LLMNR/NBT-NS response from non-DNS host (network sensor). Multiple hosts authenticating to same unexpected IP in short window. NetNTLMv2 hashes in network capture. Responder.py execution in process logs. NTLMv1 challenge-response (downgrade indicator).</td>
+        <td class="mono">Security.evtx<br>Network telemetry (PCAP/NDR)</td>
+        <td class="mitigate">Disable LLMNR via GPO (Computer Config → Admin Templates → Network → DNS Client → Turn off multicast name resolution). Disable NBT-NS (Network adapter settings). Enable SMB signing. Deploy honeypot credentials to detect Responder activity.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── DELEGATION ATTACKS ─────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Delegation Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>Unconstrained Delegation <span class="tag tag-kerb">kerberos</span></td>
+        <td>Computers with TRUSTED_FOR_DELEGATION (UF 0x80000) store TGTs of all users who authenticate to them in LSASS memory. An attacker who compromises such a host can extract all cached TGTs. Combined with coercion (PrinterBug, PetitPotam), attacker can coerce DC machine account to authenticate — capturing its TGT and achieving DCSync-equivalent access.</td>
+        <td class="detect">
+          <span class="eid">4769</span> — forwardable TGT requested for user authenticating to delegation host<br>
+          <span class="eid">4624</span> Type 3 on delegation host from coerced DC machine account<br>
+          <span class="eid">4688</span> — Rubeus.exe monitor /targetuser: on delegation host<br>
+          Sysmon EID 10 — lsass.exe access on delegation host
+        </td>
+        <td class="ioc">DC machine account (DCNAME$) authenticating to a non-DC host (coercion result). Rubeus monitor or dump on unconstrained delegation server. TGT for high-privilege account extracted from non-DC LSASS. Delegation host suddenly generating large volume of Kerberos requests.</td>
+        <td class="mono">Security.evtx (DC &amp; delegation host)</td>
+        <td class="mitigate">Eliminate unconstrained delegation — replace with constrained or RBCD. Audit: <code>Get-ADComputer -Filter {TrustedForDelegation -eq $true}</code>. Mark sensitive accounts as "cannot be delegated." Add DAs to Protected Users (blocks delegation). Disable Print Spooler on DCs to prevent coercion.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── GPO & ACL ABUSE ───────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">GPO Abuse &amp; Object ACL Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>GPO permissions / GPO files abuse <span class="tag tag-persist">persistence</span></td>
+        <td>If a non-admin account has write permissions on a GPO (CreateChild, WriteDACL, WriteProperty, GenericWrite), attacker can modify the GPO to add scheduled tasks, startup scripts, or local admin accounts that execute on all computers/users in the linked OU. Full domain compromise if GPO linked to Domain Controllers OU.</td>
+        <td class="detect">
+          <span class="eid">5136</span> — directory service object modified (GPO object attributes changed)<br>
+          <span class="eid">5137</span> — new GPO object created<br>
+          <span class="eid">4670</span> — permissions changed on GPO object<br>
+          <span class="eid">4688</span> — gpupdate /force, SYSVOL file writes<br>
+          File system: new files in <code>\\domain\SYSVOL\*\Policies\*\Machine\Scripts\</code>
+        </td>
+        <td class="ioc">GPO modification by non-admin account. New scheduled task or startup script in SYSVOL GPO path. GPO link added to sensitive OU (Domain Controllers, Tier 0). EID 5136 for GPO object outside change window. gpupdate /force execution from workstation shortly after GPO change.</td>
+        <td class="mono">Security.evtx (DC)<br>SYSVOL file changes</td>
+        <td class="mitigate">Audit GPO delegation: <code>Get-GPPermissions -All</code> for over-privileged accounts. Enable EID 5136/5137 auditing. Restrict GPO edit rights to dedicated admin accounts. BloodHound — GPO attack path analysis. Tier 0 GPOs should have no standard user write rights.</td>
+      </tr>
+      <tr>
+        <td>Object ACL abuse (WriteDACL, GenericAll, GenericWrite) <span class="tag tag-privesc">priv esc</span></td>
+        <td>Misconfigured ACLs on AD objects allow privilege escalation without exploiting vulnerabilities. GenericAll on a user = reset their password. GenericWrite on a computer = set RBCD. WriteDACL on domain object = grant self DCSync rights. ForceChangePassword on privileged account. These are BloodHound "edges" — attack paths from any domain user to DA.</td>
+        <td class="detect">
+          <span class="eid">4662</span> — access to AD object (requires SACL)<br>
+          <span class="eid">4723/4724</span> — password reset on target account<br>
+          <span class="eid">4670</span> — permissions changed on AD object<br>
+          <span class="eid">5136</span> — object attribute modified (msDS-AllowedToActOnBehalfOfOtherIdentity, member attribute for groups)
+        </td>
+        <td class="ioc">Non-admin account resetting password of privileged user (4724). ACE added granting replication rights to non-DC account (pre-DCSync). RBCD attribute written on DC computer object. GenericAll granted to low-privilege account on Domain object. BloodHound attack path exists to DA via ACL chain.</td>
+        <td class="mono">Security.evtx (DC)</td>
+        <td class="mitigate">Regular ACL audit with BloodHound, PingCastle, or Purple Knight. Remove unnecessary ACE grants from default groups (Account Operators, Backup Operators). Enable EID 5136 auditing. Implement tiered admin model. Review AD delegation quarterly.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── PKI / ADCS ATTACKS ────────────────────────────────── -->
+<div class="section">
+  <div class="section-label">PKI / AD CS Attacks</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Technique</th><th>How it works</th><th>Key detection event IDs</th><th>IOC patterns</th><th>Log source</th><th>Mitigation</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>ESC1 — Misconfigured certificate template <span class="tag tag-pki">pki / adcs</span></td>
+        <td>A certificate template with CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT enabled allows the enrolling user to specify any Subject Alternative Name (SAN) — including a DA UPN. Combined with Client Authentication EKU and broad enrollment rights, any domain user can request a cert as any user including DA, then use it to request a TGT (PKINIT) as that user. Tools: Certify.exe, certipy.</td>
+        <td class="detect">
+          <span class="eid">4886</span> — certificate requested (CA audit log)<br>
+          <span class="eid">4887</span> — certificate issued<br>
+          <span class="eid">4768</span> — TGT requested via PKINIT (Certificate authentication type)<br>
+          <span class="eid">4688</span> — Certify.exe, certipy execution<br>
+          CA audit log: request with SAN field for high-privilege user by low-privilege requestor
+        </td>
+        <td class="ioc">Certificate issued with SAN not matching the requester's UPN. Low-privilege account requesting cert with DA/EA SAN. EID 4768 using PKINIT (certificate-based) auth for privileged account from unexpected host. Certify.exe or certipy in process logs. Certificate template with msPKI-Certificate-Name-Flag = CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT.</td>
+        <td class="mono">CA Security log (Application.evtx on CA)<br>Security.evtx (DC)<br>CA audit log</td>
+        <td class="mitigate">Disable CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT on templates unless absolutely required. Require CA manager approval for such templates. Run <code>Certify.exe find /vulnerable</code> or <code>certipy find</code> against your own environment. Enable CA audit logging (EID 4886/4887). Restrict template enrollment rights to required groups only.</td>
+      </tr>
+      <tr>
+        <td>ESC8 — NTLM relay to ADCS web enrollment <span class="tag tag-pki">pki / adcs</span></td>
+        <td>The ADCS web enrollment endpoint (http://CA/certsrv) accepts NTLM authentication without requiring Extended Protection for Authentication (EPA). Attacker coerces DC machine account authentication (via PrinterBug/PetitPotam) and relays it to the web enrollment endpoint — requesting a DC certificate. Uses the DC cert to request a TGT as the DC (via PKINIT) enabling DCSync or pass-the-ticket as DC.</td>
+        <td class="detect">
+          <span class="eid">4886/4887</span> — certificate requested/issued for DC machine account from non-DC IP<br>
+          <span class="eid">4768</span> — PKINIT TGT for DC machine account from unexpected IP<br>
+          IIS logs on CA: POST to /certsrv/certfnsh.asp from unexpected IP with DC machine account<br>
+          <span class="eid">4624</span> — DC machine account logon to CA server
+        </td>
+        <td class="ioc">Certificate requested for DC$ account from non-DC IP. IIS access log: POST to certsrv from attacker IP with DC machine account NTLM auth. EID 4768 PKINIT TGT for DC machine account from attacker host. DC machine account authenticating to CA (reversed auth direction). NTLM relay tool (ntlmrelayx.py) in process logs.</td>
+        <td class="mono">CA IIS access logs<br>CA Security log<br>Security.evtx (DC)</td>
+        <td class="mitigate">Enable EPA on the ADCS web enrollment IIS site. Enable HTTPS + require SSL on certsrv. Disable HTTP (non-SSL) enrollment endpoint. Enable LDAP signing + channel binding. Disable Print Spooler on DCs. KB5005413 (PetitPotam fix). Move CA to offline/standalone where possible.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ── KEY FORENSIC ARTEFACTS ────────────────────────────── -->
+<div class="section">
+  <div class="section-label">Key Forensic Artefacts &amp; Collection Reference</div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr>
+      <th>Artefact</th><th>Location</th><th>Forensic value</th><th>Collection tool</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td>DC Security.evtx</td>
+        <td class="mono">C:\Windows\System32\winevt\Logs\Security.evtx</td>
+        <td>All authentication, object access, replication, and privilege events. Primary AD forensic source.</td>
+        <td class="caveat">EvtxECmd + KAPE Target: EventLogs. Centralise to SIEM — local log cleared by attacker (EID 1102). Minimum retention: 180 days.</td>
+      </tr>
+      <tr>
+        <td>NTDS.dit + SYSTEM hive</td>
+        <td class="mono">C:\Windows\NTDS\ntds.dit<br>C:\Windows\System32\config\SYSTEM</td>
+        <td>All domain credential hashes, Kerberos keys, and AD object data. Both files required together for decryption.</td>
+        <td class="caveat">Must be collected via VSS snapshot — live file is locked. secretsdump.py (Impacket), DSInternals, ntdsutil IFM. KAPE Target: NTDS.</td>
+      </tr>
+      <tr>
+        <td>AD replication metadata</td>
+        <td class="mono">repadmin /showmeta &lt;DN&gt;<br>repadmin /showchanges DC GUID</td>
+        <td>Timestamps and version numbers for every AD attribute change — survives log clearing. Shows when sensitive attributes were modified even if the event log is gone.</td>
+        <td class="caveat">Run from any DC. repadmin /showmeta on suspicious objects (krbtgt, Domain object nTSecurityDescriptor). Version number jump = multiple changes since baseline.</td>
+      </tr>
+      <tr>
+        <td>Kerberos ticket cache (memory)</td>
+        <td class="mono">LSASS memory<br>klist (live)<br>Volatility3: windows.registry.cachedump</td>
+        <td>Active TGTs and service tickets — forged tickets differ in lifetime, encryption type, or PAC validity. Golden Tickets visible as 10-year lifetime.</td>
+        <td class="caveat">Live: <code>klist</code> or Rubeus dump. Memory: Volatility3 windows.registry.cachedump. LiME for full memory acquisition.</td>
+      </tr>
+      <tr>
+        <td>SYSVOL / GPO files</td>
+        <td class="mono">\\domain\SYSVOL\domain\Policies\</td>
+        <td>GPP XML files (cPassword), GPO scripts, startup/logon scripts. Modified timestamps show when GPO was changed. cPassword present = immediate remediation required.</td>
+        <td class="caveat">Mount from DC or any domain-joined machine. Search for cPassword: <code>findstr /si cpassword \\domain\SYSVOL\*.xml</code>. Compare SYSVOL timestamps against EID 5136/5137 timeline.</td>
+      </tr>
+      <tr>
+        <td>CA audit log (ADCS)</td>
+        <td class="mono">certsrv.msc → Failed Requests / Issued Certificates<br>CA Security log (Application.evtx on CA server)</td>
+        <td>All certificate requests and issuances with requester identity, template, SAN fields, and timestamps. Critical for ESC1/ESC8 investigation.</td>
+        <td class="caveat">Enable CA audit via certsrv.msc → Properties → Auditing. EID 4886 (requested) + 4887 (issued) + 4888 (denied). Correlate requester UPN against SAN field for ESC1 abuse.</td>
+      </tr>
+      <tr>
+        <td>AD object attribute history</td>
+        <td class="mono">Get-ADObject / Get-ADUser / Get-ADComputer -Properties *<br>repadmin /showobjmeta</td>
+        <td>Current state of sensitive AD attributes: msDS-AllowedToDelegateTo, msDS-AllowedToActOnBehalfOfOtherIdentity, msDS-KeyCredentialLink (Shadow Credentials), userAccountControl flags, nTSecurityDescriptor, adminCount.</td>
+        <td class="caveat">DSInternals Get-ADReplAccount for credential history. BloodHound for ACL/delegation mapping. PingCastle or Purple Knight for misconfiguration audit.</td>
+      </tr>
+      <tr>
+        <td>Net logon log</td>
+        <td class="mono">C:\Windows\debug\netlogon.log (DC)</td>
+        <td>Detailed authentication debugging log — NTLM and Kerberos failures with source IP. Not enabled by default but invaluable when present. Records failed authentications that may not appear in Security.evtx.</td>
+        <td class="caveat">Enable: <code>nltest /dbflag:0x2080ffff</code>. Disable after collection to avoid disk fill. Useful for correlating spray/relay source IPs when Security log is incomplete.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<footer>Active Directory — Attacks, Detection &amp; Forensics Matrix &mdash; Peli Rufus &mdash; May 2026 &mdash; Sources: HTB Academy Windows Attacks &amp; Defense, Splunk Threat Research, ADSecurity.org, SpecterOps BloodHound documentation, NCC Group DCSync research, Altered Security, Encient DFIR cheatsheets, Microsoft MSRC advisories</footer>
+
+</body>
+</html>

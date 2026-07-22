@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Windows Memory Forensics — DFIR Reference</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #ffffff;
+  --bg2: #f5f4f0;
+  --bg3: #eeecea;
+  --text: #1a1a18;
+  --text2: #5f5e5a;
+  --text3: #888780;
+  --border: rgba(0,0,0,0.12);
+  --border2: rgba(0,0,0,0.22);
+  --accent: #534AB7;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1a; --bg2: #242422; --bg3: #2c2c2a;
+    --text: #e8e6e0; --text2: #9c9a92; --text3: #6e6c66;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+  }
+}
+
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; min-height: 100vh; }
+
+/* TOP HEADER */
+.top-header { background: var(--bg2); border-bottom: 0.5px solid var(--border2); padding: 1.25rem 2rem 0; position: sticky; top: 0; z-index: 200; }
+.header-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 0.75rem; }
+.title-block h1 { font-size: 19px; font-weight: 600; color: var(--text); }
+.title-block p  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.stats-row { display: flex; gap: 14px; flex-wrap: wrap; padding-bottom: 2px; }
+.stat { font-size: 12px; color: var(--text2); }
+.stat strong { color: var(--text); font-weight: 600; }
+
+/* TABS */
+.tab-bar { display: flex; border-top: 0.5px solid var(--border); margin-top: 4px; }
+.tab-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 10px 20px; border: none; border-bottom: 2px solid transparent; background: transparent; color: var(--text3); cursor: pointer; transition: all 0.14s; white-space: nowrap; }
+.tab-btn:hover { color: var(--text); background: var(--bg3); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* TAB PANELS */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* MATRIX CONTROLS */
+.matrix-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 0.75rem 2rem; border-bottom: 0.5px solid var(--border); background: var(--bg); }
+.search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
+.search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; font-size: 12px; }
+input[type="text"] { width: 100%; padding: 6px 10px 6px 28px; font-size: 13px; font-family: var(--font); border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); outline: none; }
+input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(83,74,183,0.12); }
+.filter-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.fbtn { font-size: 11px; font-family: var(--font); padding: 4px 10px; border: 0.5px solid var(--border2); border-radius: 20px; background: transparent; color: var(--text2); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+.fbtn:hover { background: var(--bg3); color: var(--text); }
+.fbtn.active { font-weight: 600; background: var(--bg3); color: var(--text); border-color: var(--border2); }
+
+/* LEGEND */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 0.5rem 2rem; border-bottom: 0.5px solid var(--border); font-size: 11px; color: var(--text3); align-items: center; }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 980px; }
+thead th { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 12px; border-bottom: 0.5px solid var(--border2); text-align: left; white-space: nowrap; background: var(--bg2); cursor: pointer; user-select: none; }
+thead th:hover { color: var(--text); }
+thead th .sa { display: inline-block; margin-left: 4px; opacity: 0.4; font-size: 9px; }
+thead th.sort-asc .sa::after { content: "▲"; opacity: 1; }
+thead th.sort-desc .sa::after { content: "▼"; opacity: 1; }
+thead th:not(.sort-asc):not(.sort-desc) .sa::after { content: "⇅"; }
+tbody tr { border-bottom: 0.5px solid var(--border); transition: background 0.1s; }
+tbody tr:hover { background: var(--bg2); }
+tbody tr.row-hidden { display: none; }
+td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
+.art-name { font-weight: 600; color: var(--text); white-space: nowrap; font-size: 13px; }
+.art-desc { font-size: 11px; color: var(--text2); margin-top: 2px; max-width: 195px; line-height: 1.4; }
+.cat-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.quality-cell { display: flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.bars { display: flex; gap: 2px; margin-top: 3px; }
+.bar { height: 3px; width: 10px; border-radius: 2px; background: var(--border); }
+.vol-cmd { font-family: var(--mono); font-size: 10.5px; background: var(--bg3); border: 0.5px solid var(--border); border-radius: 4px; padding: 2px 6px; display: block; margin: 2px 0; color: var(--text); white-space: pre; overflow-x: auto; max-width: 340px; }
+.ioc-cell { font-size: 11px; color: var(--text2); line-height: 1.65; }
+.ioc-item { display: flex; align-items: flex-start; gap: 5px; }
+.ioc-dot { margin-top: 5px; width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
+.source-pill { font-size: 10px; padding: 2px 7px; border-radius: 8px; border: 0.5px solid; white-space: normal; display: inline-block; line-height: 1.5; max-width: 140px; }
+.empty-state { text-align: center; padding: 3rem 2rem; color: var(--text3); font-size: 14px; display: none; }
+
+/* FOOTER */
+.footer { padding: 0.75rem 2rem; border-top: 0.5px solid var(--border); font-size: 11px; color: var(--text3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: var(--bg2); }
+.print-btn { font-size: 11px; font-family: var(--font); padding: 4px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); cursor: pointer; transition: all 0.12s; }
+.print-btn:hover { background: var(--bg3); color: var(--text); }
+
+/* CONTENT PAGES (Methodology + Mental Model) */
+.content-page { max-width: 900px; margin: 0 auto; padding: 2rem 2rem 3rem; }
+.content-page h2 { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+.page-sub { font-size: 13px; color: var(--text3); margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 0.5px solid var(--border); }
+.mono-inline { font-family: var(--mono); font-size: 11.5px; background: var(--bg3); padding: 1px 5px; border-radius: 4px; border: 0.5px solid var(--border); }
+
+/* PHASE ACCORDION */
+.phase-list { display: flex; flex-direction: column; gap: 1.25rem; }
+.phase-card { border: 0.5px solid var(--border2); border-radius: var(--radius-lg); overflow: hidden; }
+.phase-header { display: flex; align-items: center; gap: 12px; padding: 0.85rem 1.25rem; background: var(--bg2); border-bottom: 0.5px solid var(--border); cursor: pointer; user-select: none; }
+.phase-header:hover { background: var(--bg3); }
+.phase-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; color: #fff; }
+.phase-title { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; }
+.phase-sub { font-size: 11px; color: var(--text3); }
+.phase-chevron { font-size: 11px; color: var(--text3); transition: transform 0.2s; margin-left: auto; }
+.phase-card.open .phase-chevron { transform: rotate(180deg); }
+.phase-body { display: none; padding: 1.25rem; background: var(--bg); }
+.phase-card.open .phase-body { display: block; }
+.phase-body p { font-size: 13px; color: var(--text2); margin-bottom: 1rem; line-height: 1.7; }
+
+/* COMMAND BLOCKS */
+.cmd-block { background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; overflow-x: auto; }
+.cmd-block-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 0.6rem; }
+.cmd-line { font-family: var(--mono); font-size: 11.5px; color: var(--text); line-height: 2; white-space: pre; display: block; }
+.cmd-comment { font-family: var(--mono); font-size: 11px; color: var(--text3); display: block; line-height: 1.8; }
+
+/* HUNT LIST */
+.hunt-list { list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.hunt-list li { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; color: var(--text2); line-height: 1.6; }
+.hunt-list li::before { content: "→"; color: var(--text3); flex-shrink: 0; margin-top: 1px; font-size: 11px; }
+
+/* MENTAL MODEL */
+.lane-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(255px, 1fr)); gap: 1.25rem; margin-bottom: 2rem; }
+.lane-card { border: 0.5px solid var(--border2); border-radius: var(--radius-lg); overflow: hidden; }
+.lane-header { padding: 0.85rem 1.25rem 0.7rem; border-bottom: 0.5px solid var(--border); }
+.lane-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.lane-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+.lane-why { font-size: 12px; color: var(--text2); line-height: 1.55; }
+.lane-body { padding: 1rem 1.25rem; }
+.lane-steps { display: flex; flex-direction: column; gap: 7px; }
+.lane-step { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; line-height: 1.5; }
+.step-cmd { font-family: var(--mono); font-size: 10px; background: var(--bg3); border: 0.5px solid var(--border); border-radius: 4px; padding: 1px 6px; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+.step-desc { color: var(--text2); font-size: 12px; }
+
+/* CORRELATION TABLE */
+.corr-section { margin-top: 2rem; }
+.corr-section h3 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+.corr-intro { font-size: 13px; color: var(--text2); margin-bottom: 1.25rem; line-height: 1.7; }
+.corr-table-wrap { overflow-x: auto; border: 0.5px solid var(--border2); border-radius: var(--radius-lg); }
+.corr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 700px; }
+.corr-table th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); padding: 8px 14px; background: var(--bg2); border-bottom: 0.5px solid var(--border2); text-align: left; }
+.corr-table td { padding: 9px 14px; border-bottom: 0.5px solid var(--border); vertical-align: top; line-height: 1.55; font-size: 12.5px; color: var(--text2); }
+.corr-table tr:last-child td { border-bottom: none; }
+.corr-table tr:hover td { background: var(--bg2); }
+.tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 8px; margin-right: 4px; margin-bottom: 2px; white-space: nowrap; }
+
+/* CALLOUT BOXES */
+.why-box { background: var(--bg2); border: 0.5px solid var(--border2); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: 13px; color: var(--text2); line-height: 1.7; }
+.why-box strong { color: var(--text); font-weight: 600; }
+.golden-box { background: var(--bg2); border: 0.5px solid rgba(83,74,183,0.3); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-top: 2rem; font-size: 13px; color: var(--text2); line-height: 1.7; }
+.golden-box h4 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+
+@media (max-width: 700px) {
+  .top-header { padding: 1rem 1rem 0; }
+  .content-page { padding: 1rem 1rem 2rem; }
+  .tab-btn { padding: 8px 12px; font-size: 12px; }
+}
+@media print {
+  .top-header { position: static; }
+  .matrix-controls, .legend, .footer { display: none; }
+  tbody tr { page-break-inside: avoid; }
+  .phase-body { display: block !important; }
+}
+
+/* INSTALL TAB */
+.os-btn { font-family: var(--font); font-size: 13px; font-weight: 500; padding: 7px 20px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); cursor: pointer; transition: all 0.14s; }
+.os-btn:hover { background: var(--bg3); color: var(--text); }
+.os-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.install-section { margin-bottom: 2rem; }
+.install-section-title { font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 0.6rem; }
+.install-p { font-size: 13px; color: var(--text2); line-height: 1.7; margin-bottom: 0.85rem; }
+.install-note { font-size: 12px; color: var(--text2); background: var(--bg2); border: 0.5px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 0.75rem 1rem; margin-top: 0.75rem; line-height: 1.65; }
+.install-note strong { color: var(--text); }
+.tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.85rem; }
+.tool-card { background: var(--bg2); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 0.85rem 1rem; }
+.tool-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.tool-desc { font-size: 11px; color: var(--text2); line-height: 1.5; margin-bottom: 8px; }
+.tool-cmd { font-family: var(--mono); font-size: 10px; background: var(--bg3); border: 0.5px solid var(--border); border-radius: 4px; padding: 3px 7px; color: var(--text); display: block; white-space: pre; overflow-x: auto; }
+.trouble-table-wrap { overflow-x: auto; border: 0.5px solid var(--border2); border-radius: var(--radius-lg); }
+.trouble-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 560px; }
+.trouble-table th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); padding: 8px 14px; background: var(--bg2); border-bottom: 0.5px solid var(--border2); text-align: left; }
+.trouble-table td { padding: 8px 14px; border-bottom: 0.5px solid var(--border); vertical-align: top; line-height: 1.55; font-size: 12px; color: var(--text2); }
+.trouble-table tr:last-child td { border-bottom: none; }
+.trouble-table tr:hover td { background: var(--bg2); }
+</style>
+</head>
+<body>
+
+<!-- TOP HEADER -->
+<div class="top-header">
+  <div class="header-row">
+    <div class="title-block">
+      <h1>Windows Memory Forensics — DFIR Reference</h1>
+      <p>Artifact matrix &middot; analysis methodology &middot; analyst mental model &mdash; Volatility 3</p>
+    </div>
+    <div class="stats-row">
+      <span class="stat"><strong id="total-count">0</strong> artifacts</span>
+      <span class="stat"><strong>11</strong> categories</span>
+      <span class="stat"><strong>8</strong> analysis phases</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('matrix',this)">Artifact Matrix</button>
+    <button class="tab-btn" onclick="showTab('methodology',this)">Analysis Methodology</button>
+    <button class="tab-btn" onclick="showTab('mentalmodel',this)">Mental Model</button>
+    <button class="tab-btn" onclick="showTab('install',this)">Installation Guide</button>
+  </div>
+</div>
+
+<!-- ═══ TAB 1: ARTIFACT MATRIX ═══ -->
+<div id="tab-matrix" class="tab-panel active">
+  <div class="matrix-controls">
+    <div class="search-wrap">
+      <span class="search-icon">&#128269;</span>
+      <input type="text" id="search" placeholder="Search artifact, command, IOC…" oninput="applyFilters()">
+    </div>
+    <div class="filter-btns" id="cat-filters"></div>
+  </div>
+  <div class="legend">
+    <span>Forensic value:</span>
+    <span class="legend-item"><span class="dot" style="background:#1D9E75"></span>Excellent</span>
+    <span class="legend-item"><span class="dot" style="background:#378ADD"></span>Good</span>
+    <span class="legend-item"><span class="dot" style="background:#EF9F27"></span>Partial</span>
+    <span class="legend-item"><span class="dot" style="background:#E24B4A"></span>Limited</span>
+    <span style="margin-left:8px;color:var(--text3)">|</span>
+    <span style="margin-left:8px">Click column headers to sort</span>
+  </div>
+  <div class="table-wrap">
+    <table id="matrix-table">
+      <thead>
+        <tr>
+          <th onclick="sortBy(0)" class="sort-asc">Artifact <span class="sa"></span></th>
+          <th onclick="sortBy(1)">Category <span class="sa"></span></th>
+          <th onclick="sortBy(2)">Forensic value <span class="sa"></span></th>
+          <th>Full Volatility 3 command(s)</th>
+          <th>Key IOCs / what to hunt</th>
+          <th onclick="sortBy(5)">Alt source <span class="sa"></span></th>
+        </tr>
+      </thead>
+      <tbody id="matrix-body"></tbody>
+    </table>
+    <div id="empty-state" class="empty-state">No artifacts match your filter.</div>
+  </div>
+  <div class="footer">
+    <span id="row-count"></span>
+    <button class="print-btn" onclick="window.print()">&#128424; Print / Export PDF</button>
+  </div>
+</div>
+
+<!-- ═══ TAB 2: METHODOLOGY ═══ -->
+<div id="tab-methodology" class="tab-panel">
+<div class="content-page">
+  <h2>Memory Analysis Methodology</h2>
+  <p class="page-sub">A structured 8-phase approach for analysing a Windows memory dump. Click any phase to expand commands and hunting notes. Base syntax: <span class="mono-inline">vol.py -f memory.dmp &lt;plugin&gt;</span></p>
+
+  <div class="phase-list">
+
+    <div class="phase-card open">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#534AB7">1</span>
+        <div style="flex:1"><div class="phase-title">Validate &amp; profile the image</div><div class="phase-sub">Confirm OS, build number, architecture before anything else</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>Never skip this step. Wrong OS assumptions produce garbage output from every subsequent plugin. A truncated or corrupted dump will silently give you incorrect data. Confirm exactly what you are working with before interpreting any results.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Image identification</div>
+          <code class="cmd-comment"># OS version, build number, architecture, memory model</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.info</code>
+          <code class="cmd-comment"># Verify image integrity — confirms dump is not truncated</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap</code>
+          <code class="cmd-comment"># If auto-detection fails — list available symbol layers</code>
+          <code class="cmd-line">vol.py -f memory.dmp banners.Banners</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Confirm kernel version matches expected build for the target environment</li>
+          <li>Note memory size — very small dumps may be partial crash dumps, not full RAM captures</li>
+          <li>Flag any mismatch between stated build and kernel structures discovered</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#0F6E56">2</span>
+        <div style="flex:1"><div class="phase-title">Establish process baseline</div><div class="phase-sub">What is running — and what is hidden</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>Processes are always the starting point. Two views are required: the official EPROCESS linked list (pslist) and a raw pool scan (psscan). Discrepancies between these two are your first red flag — a process visible in psscan but absent from pslist has been unlinked, a classic rootkit technique. Build the full tree first, then identify anomalies before pivoting into individual processes.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Process enumeration</div>
+          <code class="cmd-comment"># Official EPROCESS linked list — what Windows knows about</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.pslist.PsList</code>
+          <code class="cmd-comment"># Hierarchical parent/child tree — spot wrong-parent processes</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.pstree</code>
+          <code class="cmd-comment"># Raw pool tag scan — catches unlinked/hidden processes (rootkits)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.psscan.PsScan</code>
+          <code class="cmd-comment"># Full command lines per process — catches cleared args, LOLBin abuse</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.cmdline.CmdLine</code>
+          <code class="cmd-comment"># Scoped to a specific PID</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.cmdline.CmdLine --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Process token privileges — SeDebugPrivilege in unexpected process = red flag</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.privileges.Privs --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># SIDs per process — spot SYSTEM SID in non-admin process (getsids IS in Vol3)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.getsids.GetSIDs --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Multi-method process view — best for hiding detection</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.psxview.PsXView</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Diff pslist vs psscan — any PID in psscan missing from pslist has been DKOM-unlinked (rootkit)</li>
+          <li>lsass.exe: exactly one instance, parent must be wininit.exe, path must be System32</li>
+          <li>svchost.exe: all instances parent to services.exe, path System32 — any exception is suspicious</li>
+          <li>Flag: cmd.exe or powershell.exe spawned from Office apps, browsers, IIS, or Java</li>
+          <li>Flag: processes running from %TEMP%, %APPDATA%, ProgramData, or user-writable paths</li>
+          <li>Flag: misspelled process names — svch0st, lssas, csrrs, svchost32, explorer32</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#993C1D">3</span>
+        <div style="flex:1"><div class="phase-title">Deep-dive suspicious processes</div><div class="phase-sub">DLLs, handles, threads, environment — per flagged PID</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>Once Phase 2 yields suspicious PIDs, pivot into each one. You are hunting for three things: what modules are loaded (DLL injection), what resources the process holds (handles — files, pipes, mutexes), and what threads it has spawned (remote thread injection). The combination of all three tells the complete story about what the process is doing and how it was compromised.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Per-process investigation</div>
+          <code class="cmd-comment"># DLLs from PEB InLoadOrder list — baseline view</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.dlllist.DllList --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># ldrmodules IS in Vol3 — compares 3 PEB loader lists to find hidden/unlinked DLLs</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.ldrmodules.LdrModules --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># FALSE in InLoad/InMem/InInit for a mapped region = reflective injection or hidden DLL</code>
+          <code class="cmd-comment"># Open handles — files, registry keys, mutexes, named pipes, events</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.handles.Handles --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># All handles across all processes (broader triage pass)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.handles.Handles</code>
+          <code class="cmd-comment"># Thread list — start addresses outside known modules = injection</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.threads.Threads --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Environment variables — staging paths, injected variables</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.envars --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Dump process executable to disk for static/AV analysis</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid &lt;PID&gt; --dump-dir ./dumps/</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Mutex names are malware family fingerprints — search any unusual mutex name immediately</li>
+          <li>Named pipe handles in unexpected processes indicate C2 over SMB named pipe transport</li>
+          <li>DLL at unusual base address or loaded from non-System32/non-program path warrants extraction</li>
+          <li>Thread start address in private (non-module) memory region = classic shellcode injection</li>
+          <li>Any non-system process holding an open handle to lsass.exe = credential theft attempt in progress</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#993556">4</span>
+        <div style="flex:1"><div class="phase-title">Code injection detection</div><div class="phase-sub">malfind, VAD analysis, shellcode — the irreplaceable phase</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>This is where memory forensics is genuinely irreplaceable. Fileless malware, injected shellcode, process hollowing, and reflective DLL loads leave zero disk artifacts. The VAD tree is your map of a process's memory layout — regions that are executable but not backed by a file on disk are your primary target. malfind automates the most common checks. Always dump and run flagged regions through YARA or a sandbox before concluding.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Injection detection</div>
+          <code class="cmd-comment"># Find RWX memory not backed by a file — primary injection detection</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.malfind.Malfind</code>
+          <code class="cmd-comment"># Scoped to one process</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.malfind.Malfind --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Dump all flagged regions for YARA/sandbox/reverse engineering</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.malfind.Malfind --dump --dump-dir ./malfind_dumps/</code>
+          <code class="cmd-comment"># Direct hollowing detection</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.hollowprocesses.HollowProcesses</code>
+          <code class="cmd-comment"># Full VAD tree — complete virtual memory map for a process</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.vadinfo.VadInfo --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># YARA scan against a specific process's VAD regions</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.vadyarascan --pid &lt;PID&gt; --yara-rules rules.yar</code>
+          <code class="cmd-comment"># YARA scan across the entire memory image</code>
+          <code class="cmd-line">vol.py -f memory.dmp yarascan.YaraScan --yara-rules /opt/rules/malware.yar</code>
+          <code class="cmd-comment"># SSDT hooks — syscall table tampering indicating kernel rootkit</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.ssdt</code>
+          <code class="cmd-comment"># Kernel callbacks — registered notification routines (persistence/monitoring)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.callbacks</code>
+        </div>
+        <ul class="hunt-list">
+          <li>RWX (read-write-execute) regions not mapped to a file on disk = almost always malicious</li>
+          <li>MZ/PE header (bytes 4D 5A) at the start of a private region = reflective DLL injection or process hollowing</li>
+          <li>Process hollowing signature: legitimate process with VAD showing private executable at the expected module base address</li>
+          <li>SSDT entries pointing outside ntoskrnl.exe or win32k.sys = active kernel-mode hook</li>
+          <li>Run all dumped regions through: strings → YARA → capa → VirusTotal hash lookup</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#0F6E56">5</span>
+        <div style="flex:1"><div class="phase-title">Network artifact analysis</div><div class="phase-sub">Active connections, closed sockets, C2 identification</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>Network data read directly from kernel structures is far more reliable than a live netstat — rootkits commonly hook the userland APIs that netstat calls, but reading raw pool structures is much harder to tamper with. netscan will also surface connections that have recently closed but whose kernel objects haven't been freed, giving you a short historical window. Always correlate the owning PID against your process analysis from Phases 2 and 3.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Network connections</div>
+          <code class="cmd-comment"># Active TCP/UDP connections and listeners via TCPv4/v6 structures</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.netstat.NetStat</code>
+          <code class="cmd-comment"># Pool scan — catches recently closed connections kernel hasn't freed yet</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.netscan.NetScan</code>
+          <code class="cmd-comment"># Dump DNS client svchost memory to extract cached domain fragments</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap --dump --pid &lt;DNS_svchost_PID&gt;</code>
+          <code class="cmd-comment"># Then extract domain strings from the dump</code>
+          <code class="cmd-comment"># strings pid.&lt;PID&gt;.dmp | grep -iE '\.[a-z]{2,6}$' | sort -u &gt; domains.txt</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Any established connection from a process that should not have network access (notepad, calc, mspaint)</li>
+          <li>Outbound connections on 443/80 from non-browser processes — C2 traffic commonly blends with web traffic</li>
+          <li>Short-lived connections to rare external IPs — data exfil often bursts then immediately closes</li>
+          <li>Connections from unusual source to internal hosts on SMB (445), RDP (3389), WMI (135) = lateral movement</li>
+          <li>High-entropy or algorithmically-generated domain names in DNS fragments = DGA-based C2</li>
+          <li>Submit all external IPs to VirusTotal, Shodan, and AbuseIPDB for reputation check</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#854F0B">6</span>
+        <div style="flex:1"><div class="phase-title">Registry &amp; persistence hunting</div><div class="phase-sub">In-memory hives, run keys, services, deleted persistence</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>Windows keeps all active registry hives mapped in memory. You can read registry data from the dump without ever touching disk — and critically, you may find persistence keys that have been deleted from disk but not yet flushed from the in-memory hive. This anti-forensics bypass catches attackers who clean up their tracks on disk: the deletion is on disk, but the in-memory copy hasn't been purged yet.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Registry persistence analysis</div>
+          <code class="cmd-comment"># List all registry hives loaded in memory</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.hivelist</code>
+          <code class="cmd-comment"># HKCU Run key — user-level autorun (most common malware persistence)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.printkey \
+  --key "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"</code>
+          <code class="cmd-comment"># RunOnce — executes once at next logon then self-deletes</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.printkey \
+  --key "SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce"</code>
+          <code class="cmd-comment"># Services key — all installed services including hidden ones</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.printkey \
+  --key "SYSTEM\CurrentControlSet\Services"</code>
+          <code class="cmd-comment"># Scan all service objects in memory pool (catches hidden services)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.svcscan.SvcScan</code>
+          <code class="cmd-comment"># UserAssist — GUI program execution history (ROT13 encoded subkeys)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.printkey \
+  --key "SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\UserAssist"</code>
+          <code class="cmd-comment"># AppCompat ShimCache — execution evidence including deleted files</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.printkey \
+  --key "SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache"</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Registry keys pointing to executables in TEMP, AppData, ProgramData, or Downloads</li>
+          <li>Services with random or meaningless names, minimal descriptions, binary paths outside Program Files</li>
+          <li>svcscan returning more entries than the official service list = hidden service objects in pool</li>
+          <li>RunOnce is subtle — survives exactly one reboot then removes itself, easy to miss in disk forensics</li>
+          <li>UserAssist cross-referenced against process timeline can reveal execution gaps or tool usage</li>
+          <li>ShimCache contains evidence of files that executed even if the file was subsequently deleted</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#185FA5">7</span>
+        <div style="flex:1"><div class="phase-title">Credential extraction</div><div class="phase-sub">LSASS, Kerberos, hashes, DPAPI — handle with care</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>LSASS holds everything the attacker wants. The safest IR approach is to dump the LSASS process from Volatility and run Mimikatz offline against the dump on your analyst workstation — this avoids running any tooling live on the compromised host. Kerberos tickets are especially valuable: they are time-limited cryptographic tokens that cannot be reconstructed from disk and expire, so they must be captured from memory promptly.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Credential artifacts</div>
+          <code class="cmd-comment"># Direct NTLM hash extraction from SAM/LSASS kernel structures</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.hashdump.Hashdump</code>
+          <code class="cmd-comment"># LSA secrets — service account passwords, cached domain credentials ($DCC2)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.lsadump.Lsadump</code>
+          <code class="cmd-comment"># Cached domain credentials ($DCC2 hashes)</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.registry.cachedump.Cachedump</code>
+          <code class="cmd-comment"># Find lsass PID for process dump</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.pslist.PsList | grep lsass</code>
+          <code class="cmd-comment"># Dump entire LSASS process for offline Mimikatz analysis</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid &lt;lsass_PID&gt; --dump-dir ./lsass_dump/</code>
+          <code class="cmd-comment"># Offline on analyst machine — extract logon passwords</code>
+          <code class="cmd-comment"># mimikatz "sekurlsa::minidump lsass.dmp" "sekurlsa::logonpasswords" exit</code>
+          <code class="cmd-comment"># Offline — export all Kerberos tickets to .kirbi files</code>
+          <code class="cmd-comment"># mimikatz "sekurlsa::minidump lsass.dmp" "sekurlsa::tickets /export" exit</code>
+          <code class="cmd-comment"># Clipboard — credentials, sensitive data, staged exfil content</code>
+          <code class="cmd-comment"># No native clipboard plugin in Vol3 — dump the process owning the clipboard</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap --dump --pid &lt;PID&gt; -o ./clip_dump/</code>
+          <code class="cmd-comment"># Extract clipboard strings from process dump</code>
+          <code class="cmd-line">strings -el ./clip_dump/*.dmp | grep -iE ".{8,}" &gt; clipboard_strings.txt</code>
+          <code class="cmd-comment"># Console history — every command the attacker typed in cmd.exe</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.consoles.Consoles</code>
+          <code class="cmd-comment"># Active logon sessions</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.sessions.Sessions</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Kerberos tickets with 10-year validity = Golden Ticket — indicates full domain compromise</li>
+          <li>Service tickets without a corresponding TGT = Silver Ticket — targeted service forgery</li>
+          <li>WDigest enabled (UseLogonCredential=1 in HKLM) means cleartext passwords are in LSASS memory</li>
+          <li>NTLM hashes for domain admin or service accounts enable pass-the-hash lateral movement</li>
+          <li>Console history is especially valuable — it captures every command the attacker typed including recon, lateral movement, and cleanup commands</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-card">
+      <div class="phase-header" onclick="togglePhase(this)">
+        <span class="phase-num" style="background:#3B6D11">8</span>
+        <div style="flex:1"><div class="phase-title">Extract &amp; enrich artifacts</div><div class="phase-sub">Dump, YARA scan, strings, threat intel — build the full picture</div></div>
+        <span class="phase-chevron">&#9660;</span>
+      </div>
+      <div class="phase-body">
+        <p>The final phase converts memory artifacts into actionable intelligence. Dumped processes and memory regions go through static analysis, YARA rules, capability extraction (capa), and threat intel enrichment. The unpacked version of any packed malware found in memory is a significant analytical prize — it is ready for reverse engineering without fighting the packer, and often contains cleartext C2 configuration that the packed version hides.</p>
+        <div class="cmd-block">
+          <div class="cmd-block-label">Artifact extraction and enrichment</div>
+          <code class="cmd-comment"># Dump all files cached in memory by the Windows cache manager</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.dumpfiles.DumpFiles --dump-dir ./cached_files/</code>
+          <code class="cmd-comment"># Dump full address space of a specific process</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap --dump --pid &lt;PID&gt;</code>
+          <code class="cmd-comment"># Dump malfind-flagged regions — unpacked malware, shellcode</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.malware.malfind.Malfind --dump --dump-dir ./injected/</code>
+          <code class="cmd-comment"># Scan entire image with YARA ruleset (Elastic, Signature-Base, custom)</code>
+          <code class="cmd-line">vol.py -f memory.dmp yarascan.YaraScan --yara-rules /opt/rules/malware.yar</code>
+          <code class="cmd-comment"># File object scan — everything with an open file object in memory</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.filescan.FileScan</code>
+          <code class="cmd-comment"># Kernel driver pool scan — diff with modules to find hidden drivers</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.driverscan.DriverScan</code>
+          <code class="cmd-line">vol.py -f memory.dmp windows.modules.Modules</code>
+          <code class="cmd-comment"># Raw string extraction — IPs, URLs, domains, registry keys, paths</code>
+          <code class="cmd-comment"># strings -el memory.dmp | grep -iE 'https?://|\\[A-Za-z]|HKEY' &gt; strings_out.txt</code>
+          <code class="cmd-comment"># Bulk IOC extraction (emails, URLs, IPs, domains, credit cards)</code>
+          <code class="cmd-comment"># bulk_extractor -o bulk_out/ memory.dmp</code>
+        </div>
+        <ul class="hunt-list">
+          <li>Run all dumped PE files through sha256sum → VirusTotal lookup before opening locally</li>
+          <li>Use capa on dumped samples to extract capabilities (C2 comms, persistence, AV evasion) without full reversing</li>
+          <li>Drivers in driverscan not present in modules = hidden kernel module (active rootkit driver)</li>
+          <li>Unpacked malware dumps frequently contain cleartext C2 config — run strings first before reversing</li>
+          <li>Bulk IOC harvest from strings output: extract unique IPs, domains, file hashes → feed into SIEM detections</li>
+          <li>Submit extracted samples to ANY.RUN or Cuckoo for dynamic analysis and automated IOC extraction</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ═══ TAB 3: MENTAL MODEL ═══ -->
+<div id="tab-mentalmodel" class="tab-panel">
+<div class="content-page">
+  <h2>Analyst Mental Model</h2>
+  <p class="page-sub">Three parallel analysis lanes running simultaneously. The power is not in any single lane — it is in correlation across all three. A lone anomaly is noise. The same anomaly confirmed in two lanes is a lead. All three lanes pointing at the same PID or timestamp is your confirmed threat.</p>
+
+  <div class="why-box">
+    <strong>Why correlate across lanes?</strong><br><br>
+    Sophisticated attackers know that isolated indicators get dismissed. A single unusual process might be legitimate software behaving oddly. A connection to an odd IP might be telemetry or update traffic. A suspicious registry key might be leftover from software long uninstalled.<br><br>
+    But when the same actor leaves a footprint in all three lanes simultaneously — a process running injected code (<strong>Process lane</strong>), making outbound C2 connections (<strong>Network lane</strong>), and installing a Run key for persistence (<strong>Persistence lane</strong>) — each lane validates the others and the case becomes unambiguous.<br><br>
+    <strong>Process lane alone</strong> tells you something is executing. It does not tell you if it is exfiltrating data or whether it survives a reboot.<br>
+    <strong>Network lane alone</strong> tells you there is suspicious traffic. Without knowing what process owns it, you cannot attribute or scope the compromise.<br>
+    <strong>Persistence lane alone</strong> tells you the attacker intends to stay. It does not tell you what malicious code is currently active.<br><br>
+    All three together tell the complete attack story: initial access → execution → persistence → command and control, all visible in a single memory snapshot. This is why correlation transforms weak signals into high-confidence, attribution-grade findings.
+  </div>
+
+  <div class="lane-grid">
+    <div class="lane-card">
+      <div class="lane-header" style="background:rgba(83,74,183,0.07);border-bottom:0.5px solid rgba(83,74,183,0.2)">
+        <div class="lane-title">
+          <span class="lane-icon" style="background:rgba(83,74,183,0.15);color:#534AB7">&#9999;</span>
+          <span style="color:#534AB7">Process lane</span>
+        </div>
+        <div class="lane-why">Answers: <em>What is executing?</em> Is it legitimate or malicious, visible or hidden, injected or clean?</div>
+      </div>
+      <div class="lane-body">
+        <div class="lane-steps">
+          <div class="lane-step"><span class="step-cmd">windows.pslist.PsList</span><span class="step-desc">Official OS process list</span></div>
+          <div class="lane-step"><span class="step-cmd">windows.psscan.PsScan</span><span class="step-desc">Pool scan — catches hidden/unlinked</span></div>
+          <div class="lane-step"><span class="step-cmd">windows.pstree</span><span class="step-desc">Parent-child — spot wrong parents</span></div>
+          <div class="lane-step"><span class="step-cmd">malware.malfind</span><span class="step-desc">Injected code / shellcode (non-deprecated)</span></div>
+          <div class="lane-step"><span class="step-cmd">malware.ldrmodules</span><span class="step-desc">Hidden DLL detection (3 PEB lists)</span></div>
+          <div class="lane-step"><span class="step-cmd">windows.cmdline.CmdLine</span><span class="step-desc">Full args — cleared args still here</span></div>
+          <div class="lane-step"><span class="step-cmd">windows.handles.Handles</span><span class="step-desc">LSASS handle = credential theft</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane-card">
+      <div class="lane-header" style="background:rgba(15,110,86,0.07);border-bottom:0.5px solid rgba(15,110,86,0.2)">
+        <div class="lane-title">
+          <span class="lane-icon" style="background:rgba(15,110,86,0.15);color:#0F6E56">&#127760;</span>
+          <span style="color:#0F6E56">Network lane</span>
+        </div>
+        <div class="lane-why">Answers: <em>Who is the process talking to?</em> C2 servers, lateral targets, exfil destinations.</div>
+      </div>
+      <div class="lane-body">
+        <div class="lane-steps">
+          <div class="lane-step"><span class="step-cmd">windows.netscan.NetScan</span><span class="step-desc">All sockets incl. recently closed</span></div>
+          <div class="lane-step"><span class="step-cmd">windows.netstat.NetStat</span><span class="step-desc">Active established connections</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Pivot on PID — cross-ref to Process lane</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Submit IPs to VirusTotal / Shodan</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; DNS fragments from svchost heap</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Beaconing interval = C2 heartbeat</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Internal targets = lateral movement</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lane-card">
+      <div class="lane-header" style="background:rgba(133,79,11,0.07);border-bottom:0.5px solid rgba(133,79,11,0.2)">
+        <div class="lane-title">
+          <span class="lane-icon" style="background:rgba(133,79,11,0.15);color:#854F0B">&#128274;</span>
+          <span style="color:#854F0B">Persistence lane</span>
+        </div>
+        <div class="lane-why">Answers: <em>How does the attacker plan to survive?</em> Reboots, logoffs, remediation attempts.</div>
+      </div>
+      <div class="lane-body">
+        <div class="lane-steps">
+          <div class="lane-step"><span class="step-cmd">windows.svcscan.SvcScan</span><span class="step-desc">All services incl. hidden ones</span></div>
+          <div class="lane-step"><span class="step-cmd">registry.printkey.PrintKey</span><span class="step-desc">Run / RunOnce / Services keys</span></div>
+          <div class="lane-step"><span class="step-cmd">registry.hivelist.HiveList</span><span class="step-desc">Unexpected hives are suspicious</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Deleted keys may still be in memory hive</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Cross-ref service paths vs process paths</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; Scheduled task binaries in filescan</span></div>
+          <div class="lane-step"><span class="step-desc" style="padding-left:4px">&#8627; WMI subscriptions in handles output</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="corr-section">
+    <h3>Cross-lane correlation map</h3>
+    <p class="corr-intro">Each row is a real attack pattern. No single lane alone is definitive — all three together eliminate false positives and build an unambiguous case. The final column is your verdict when all three lanes agree.</p>
+    <div class="corr-table-wrap">
+      <table class="corr-table">
+        <thead>
+          <tr>
+            <th>Attack pattern</th>
+            <th>Process lane finds</th>
+            <th>Network lane finds</th>
+            <th>Persistence lane finds</th>
+            <th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cobalt Strike beacon</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">malfind</span>Injected PE in svchost/explorer; MZ header in private RWX region</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>HTTPS beacon on 443 from svchost; short periodic interval (~60s)</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">svcscan</span>New service or Run key pointing to injected or dropped stager</td>
+            <td><strong style="color:#A32D2D">Active C2 implant — confirmed compromise</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Credential dumping (Mimikatz)</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">handles</span>Non-system process holding open handle to lsass.exe</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>Outbound connection shortly after — credential exfil burst to C2</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">lsadump</span>SAM/LSA secrets accessed; WDigest reg key set to 1</td>
+            <td><strong style="color:#A32D2D">Credential theft — dump LSASS immediately</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Lateral movement (PsExec/WMI)</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">pstree</span>cmd.exe spawned from services.exe or WmiPrvSE.exe with remote host args</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>Outbound SMB (445) or WMI (135) connections to internal host IPs</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">svcscan</span>PSEXESVC or random-named service; service binary in ADMIN$ share</td>
+            <td><strong style="color:#A32D2D">Lateral movement — pivot to target host memory</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Ransomware execution</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">cmdline</span>vssadmin delete shadows; wbadmin delete; crypto process active</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>C2 connection for key exchange or exfil before encryption begins</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">registry</span>Run key for ransom note display; boot sector / BCD modifications</td>
+            <td><strong style="color:#A32D2D">Active encryption — isolate immediately, preserve memory</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Fileless PowerShell attack</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">malfind</span>Encoded .NET assembly in PowerShell heap; zero disk artifact</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>WebClient/DownloadString call visible in netstat owning PID</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">registry</span>WMI subscription or Run key with encoded PowerShell command</td>
+            <td><strong style="color:#A32D2D">Fileless attack — disk forensics alone would miss this entirely</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Rootkit / kernel implant</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">psscan</span>Process in psscan, absent from pslist — DKOM object unlinking</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>Connections visible in raw scan but absent from userland netstat</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">driverscan</span>Driver in driverscan not in modules; SSDT hooks on key syscalls</td>
+            <td><strong style="color:#A32D2D">Kernel-level compromise — EDR likely blind to this</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Data exfiltration</strong></td>
+            <td><span class="tag" style="background:rgba(83,74,183,0.1);color:#534AB7">handles</span>Process holding open handles to finance/HR/IP sensitive files</td>
+            <td><span class="tag" style="background:rgba(15,110,86,0.1);color:#0F6E56">netscan</span>Large sustained outbound transfer to cloud storage or rare external IP</td>
+            <td><span class="tag" style="background:rgba(133,79,11,0.1);color:#854F0B">clipboard</span>Clipboard contains sensitive doc content; console shows archiving cmds</td>
+            <td><strong style="color:#A32D2D">Active or recent exfil — check proxy logs for transfer volume</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="golden-box">
+    <h4>The golden rule of memory forensics</h4>
+    Memory analysis is about <strong>correlation and anomaly detection</strong>, not finding one smoking gun. A single weird process means little. A process with injected code, an active C2 connection, and a persistence mechanism is your case. Build the story across all artifacts and across all three lanes.<br><br>
+    Memory is a <strong>snapshot in time</strong>. Its value degrades the moment the system reboots or the attacker runs cleanup. In IR, memory acquisition should happen <strong>before anything else</strong> — even before pulling event logs — because everything else persists to disk but memory does not. The analyst who gets the memory dump first gets the full picture.
+  </div>
+
+</div>
+</div>
+
+<script>
+/* TAB SWITCHING */
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* PHASE ACCORDION */
+function togglePhase(header) {
+  header.closest('.phase-card').classList.toggle('open');
+}
+
+/* MATRIX DATA */
+const CATS = {
+  "Process":"#534AB7","Network":"#0F6E56","Registry":"#854F0B","Credentials":"#993C1D",
+  "Injection":"#993556","Kernel":"#185FA5","User Activity":"#3B6D11","File System":"#5F5E5A",
+  "Browser":"#3B8BD4","Persistence":"#BA7517","Threat Intel":"#A32D2D"
+};
+const QUAL_ORDER = {"Excellent":4,"Good":3,"Partial":2,"Limited":1};
+const QUAL = {
+  "Excellent":{color:"#1D9E75",bars:5},
+  "Good":{color:"#378ADD",bars:4},
+  "Partial":{color:"#EF9F27",bars:3},
+  "Limited":{color:"#E24B4A",bars:2}
+};
+
+const DATA = [
+  // ── PROCESS ──
+  {art:"Process list (pslist)",desc:"Official EPROCESS linked list — what Windows reports",cat:"Process",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.pslist","vol.py -f memory.dmp windows.pstree"],
+   iocs:["Misspelled legit names (svch0st, lssas)","Processes running from wrong paths","Multiple lsass/csrss instances","Unexpected parent-child (Word→cmd)"],
+   src:"Task Manager (spoofable)"},
+  {art:"Hidden processes (psscan)",desc:"Raw pool scan — catches DKOM-unlinked/hidden processes",cat:"Process",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.psscan","# Diff vs pslist: PID in psscan but not pslist = unlinked (rootkit)"],
+   iocs:["PID in psscan missing from pslist","Timestomped creation times","No visible parent process"],
+   src:"None — memory only"},
+  {art:"Multi-method process view (psxview)",desc:"Compares 4+ process enumeration methods to spot hiding",cat:"Process",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.malware.psxview.PsXView","vol.py -f memory.dmp windows.psxview"],
+   iocs:["Process FALSE in any scan method = hiding attempt","Discrepancy between pslist/psscan/handles/sessions","Classic rootkit signature"],
+   src:"None — memory only (use this for definitive hiding detection)"},
+  {art:"Process command line",desc:"Full CLI args including post-launch cleared args",cat:"Process",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.cmdline","vol.py -f memory.dmp windows.cmdline --pid <PID>"],
+   iocs:["Encoded PowerShell (-enc, -EncodedCommand)","LOLBin abuse (certutil, mshta, regsvr32, wscript)","Download cradles (IEX, DownloadString)","Double-extension files (invoice.pdf.exe)"],
+   src:"Event ID 4688 (partial)"},
+  {art:"Process environment vars",desc:"Full env block per process — %TEMP%, %APPDATA%, PATH",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.envars","vol.py -f memory.dmp windows.envars --pid <PID>"],
+   iocs:["Unusual USERPROFILE or TEMP paths","Malware staging directories in PATH","Injected environment entries"],
+   src:"None — memory only"},
+  {art:"Process SIDs (getsids)",desc:"SIDs associated with each process token",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.getsids.GetSIDs","vol.py -f memory.dmp windows.getsids.GetSIDs --pid <PID>"],
+   iocs:["Non-admin process with SYSTEM SID (S-1-5-18)","Privilege escalation — unexpected high-priv SID","Service SIDs in interactive user processes"],
+   src:"None — memory only"},
+  {art:"Process token privileges",desc:"Privilege set held by each process token",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.privileges.Privs","vol.py -f memory.dmp windows.privileges.Privs --pid <PID>"],
+   iocs:["SeDebugPrivilege in non-admin process = credential dumping","SeImpersonatePrivilege abuse (token theft)","SeLoadDriverPrivilege = driver install capability"],
+   src:"None — memory only"},
+  {art:"Process handles",desc:"Open handles: files, registry, mutexes, events, pipes",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.handles","vol.py -f memory.dmp windows.handles --pid <PID>","vol.py -f memory.dmp windows.mutantscan.MutantScan"],
+   iocs:["Mutex names matching malware families","Open handles to lsass.exe from non-system process","Named pipe C2 channels","Unusual file paths held open"],
+   src:"None — memory only"},
+  {art:"Thread list",desc:"Active threads per process with start addresses",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.threads.Threads --pid <PID>","vol.py -f memory.dmp windows.thrdscan.ThrdScan","vol.py -f memory.dmp windows.malware.suspicious_threads.SuspiciousThreads"],
+   iocs:["Thread start address in private/unbacked memory","Remote thread injection (CreateRemoteThread)","Suspicious thread start address outside any module"],
+   src:"None — memory only"},
+  {art:"PEB masquerade detection",desc:"Detects process name spoofing via EPROCESS vs PEB mismatch",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.malware.pebmasquerade.PebMasquerade"],
+   iocs:["EPROCESS name differs from PEB ImagePathName","Malware impersonating svchost/lsass by manipulating PEB","Process with inconsistent name fields"],
+   src:"None — memory only"},
+  // ── INJECTION ──
+  {art:"Code injection (malfind)",desc:"Private executable memory not backed by a file on disk",cat:"Injection",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.malware.malfind.Malfind","vol.py -f memory.dmp windows.malware.malfind.Malfind --pid <PID>","vol.py -f memory.dmp windows.malware.malfind.Malfind --dump --dump-dir ./malfind_dumps/"],
+   iocs:["MZ/PE header in private RWX region","Shellcode NOP sleds or int3 patterns","RWX memory absent from dlllist and vadinfo file backing","Process hollowing — private executable at module base address"],
+   src:"None — memory only (irreplaceable)"},
+  {art:"Process hollowing detection",desc:"Direct detection of hollowed processes",cat:"Injection",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.malware.hollowprocesses.HollowProcesses"],
+   iocs:["Legitimate process image replaced with injected PE","VAD shows private executable where mapped image expected","Discrepancy between on-disk and in-memory PE content"],
+   src:"None — memory only"},
+  {art:"Process ghosting detection",desc:"Detects processes using delete-pending file techniques",cat:"Injection",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.malware.processghosting.ProcessGhosting"],
+   iocs:["DeletePending bit set on process FILE_OBJECT","FILE_OBJECT pointer set to 0","VADs marked DeleteOnClose — evasion of AV scanning"],
+   src:"None — memory only"},
+  {art:"VAD tree (vadinfo)",desc:"Virtual Address Descriptor tree — complete memory region map",cat:"Injection",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.vadinfo.VadInfo","vol.py -f memory.dmp windows.vadinfo.VadInfo --pid <PID>","vol.py -f memory.dmp windows.vadwalk.VadWalk --pid <PID>"],
+   iocs:["Private executable VAD regions not backed by file","MZ headers at start of private regions","RWX page permissions in private regions","Large committed private sections"],
+   src:"None — memory only"},
+  {art:"LDR modules (ldrmodules)",desc:"Compares 3 PEB loader lists to find hidden/unlinked DLLs",cat:"Injection",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.malware.ldrmodules.LdrModules","vol.py -f memory.dmp windows.malware.ldrmodules.LdrModules --pid <PID>"],
+   iocs:["DLL present in VAD but FALSE in InLoad/InMem/InInit = reflective injection","All three lists FALSE for a mapped image = fully hidden DLL","Discrepancy between any two loader lists"],
+   src:"None — memory only"},
+  {art:"Loaded DLLs (dlllist)",desc:"DLLs from PEB InLoadOrder list per process",cat:"Injection",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.dlllist.DllList","vol.py -f memory.dmp windows.dlllist.DllList --pid <PID>"],
+   iocs:["DLLs loaded from temp/appdata/ProgramData","DLL with no path (reflective load)","Known-bad DLL names","Unsigned DLL in signed process space"],
+   src:"Disk (partial) — use ldrmodules for hidden DLL detection"},
+  {art:"IAT inspection",desc:"Extract Import Address Table to identify API usage",cat:"Injection",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.iat.IAT --pid <PID>"],
+   iocs:["VirtualAlloc+WriteProcessMemory+CreateRemoteThread combo = injection","APIs inconsistent with stated process purpose","Hooked IAT entries — address outside module range"],
+   src:"None — memory only"},
+  {art:"Unhooked syscall detection",desc:"Detects hooked ntdll stubs and direct/indirect syscall abuse",cat:"Injection",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.malware.unhooked_system_calls.UnhookedSystemCalls","vol.py -f memory.dmp windows.malware.direct_system_calls.DirectSystemCalls","vol.py -f memory.dmp windows.malware.indirect_system_calls.IndirectSystemCalls"],
+   iocs:["ntdll stubs patched to bypass EDR hooks","Direct syscall instructions in user-mode code","Indirect syscall trampolines — advanced EDR evasion"],
+   src:"None — memory only"},
+  {art:"ETW patch detection",desc:"Detects Event Tracing for Windows patching by malware",cat:"Injection",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.etwpatch.EtwPatch"],
+   iocs:["ETW patched to blind security tooling","NtTraceEvent/EtwEventWrite patched with ret instruction","Common in advanced C2 frameworks and ransomware"],
+   src:"None — memory only"},
+  // ── KERNEL ──
+  {art:"SSDT hooks",desc:"System Service Descriptor Table — kernel-mode hook detection",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.ssdt.SSDT"],
+   iocs:["SSDT entries outside ntoskrnl.exe or win32k.sys","Hooks on NtOpenProcess, NtReadVirtualMemory, NtQuerySystemInformation","Any modified SSDT entry — classic rootkit technique"],
+   src:"None — memory only"},
+  {art:"Kernel callbacks",desc:"Registered kernel notification routines",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.callbacks.Callbacks"],
+   iocs:["Callbacks from unsigned or unknown driver","Process/image load callbacks outside known EDR drivers","Thread creation callbacks used for injection monitoring"],
+   src:"None — memory only"},
+  // ── NETWORK ──
+  {art:"Active TCP connections (netstat)",desc:"Live TCP connections from kernel tracking structures",cat:"Network",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.netstat.NetStat"],
+   iocs:["Established connections from processes with no network role","Non-browser process on 80/443","Internal recon connections (445, 3389, 135)","Beaconing pattern — periodic short-lived connections"],
+   src:"Sysmon Event ID 3, firewall logs"},
+  {art:"Network pool scan (netscan)",desc:"Pool scan — catches active and recently closed sockets",cat:"Network",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.netscan.NetScan"],
+   iocs:["Recently closed C2 connections still in pool","UDP listeners in unexpected processes","Connections missing from netstat (partial rootkit hiding)","Short-lived exfil burst connections"],
+   src:"Firewall/proxy logs (for historical)"},
+  {art:"DNS cache fragments",desc:"Partial DNS cache from DNS client svchost heap",cat:"Network",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.pslist | grep -i svchost","vol.py -f memory.dmp windows.memmap --dump --pid <DNS_svchost_PID>","# strings pid.dmp | grep -iE '[a-z0-9-]+\\.[a-z]{2,6}' | sort -u > domains.txt"],
+   iocs:["DGA-pattern domain names","Recently resolved C2 infrastructure","High-entropy subdomain strings (beaconing)"],
+   src:"ipconfig /displaydns (live), DNS server logs"},
+  // ── REGISTRY ──
+  {art:"Registry hive list",desc:"All registry hives currently mapped in memory",cat:"Registry",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.registry.hivelist.HiveList","vol.py -f memory.dmp windows.registry.hivescan.HiveScan"],
+   iocs:["Unexpected hive paths outside System32 or user profiles","Extra SAM or SECURITY hives","Hive loaded from temp or suspicious path"],
+   src:"Disk hives (offline)"},
+  {art:"Registry key inspection",desc:"Read specific keys from in-memory hives",cat:"Registry",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.registry.printkey.PrintKey --key \"SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run\"","vol.py -f memory.dmp windows.registry.printkey.PrintKey --key \"SYSTEM\\\\CurrentControlSet\\\\Services\"","vol.py -f memory.dmp windows.registry.printkey.PrintKey --key \"SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Explorer\\\\UserAssist\""],
+   iocs:["Persistence keys pointing to temp/appdata paths","Encoded command lines in key values","Deleted-on-disk binaries still in memory hive","Keys modified during attack window"],
+   src:"Disk hives (more complete — memory may have deleted keys disk does not)"},
+  {art:"UserAssist (execution history)",desc:"GUI program execution history with timestamps and run counts",cat:"Registry",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.registry.userassist.UserAssist"],
+   iocs:["Execution of dropped attack tools","Access to staging or exfil directories","Execution timeline gaps vs process analysis"],
+   src:"NTUSER.DAT hive on disk"},
+  {art:"ShimCache (AppCompat)",desc:"Reads Shimcache from ahcache.sys AVL tree in memory",cat:"Registry",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.shimcachemem.ShimcacheMem"],
+   iocs:["Execution of subsequently deleted files","Lateral movement tools (psexec, mimikatz variants)","Timestomped binary entries"],
+   src:"SYSTEM hive AppCompatCache key (disk — better for full history). NOTE: shimcachemem reads from the live ahcache.sys kernel AVL tree, not the registry key — entries here may not yet be flushed to disk, making it MORE current than the on-disk artefact for recently executed binaries"},
+  {art:"Amcache",desc:"Executed application metadata from AmCache hive",cat:"Registry",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.registry.amcache.Amcache"],
+   iocs:["SHA1 hashes of executed files — submit to VirusTotal","Execution of files since deleted","Timestamps of first execution"],
+   src:"C:\\Windows\\AppCompat\\Programs\\Amcache.hve (disk)"},
+  {art:"Scheduled tasks",desc:"Decodes scheduled task info from registry in memory",cat:"Registry",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.registry.scheduled_tasks.ScheduledTasks"],
+   iocs:["Tasks executing from temp or appdata paths","Tasks with encoded command lines","Recently created tasks during attack window","Tasks running as SYSTEM with unusual actions"],
+   src:"C:\\Windows\\System32\\Tasks (disk), Event ID 4698"},
+  {art:"Registry certificates",desc:"Certificates in registry Certificate Store",cat:"Registry",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.registry.certificates.Certificates"],
+   iocs:["Rogue root CA certificates installed for HTTPS interception","Code signing certificates used by malware","Certificates installed during attack window"],
+   src:"certmgr.msc, HKLM\\SOFTWARE\\Microsoft\\SystemCertificates"},
+  // ── PERSISTENCE ──
+  {art:"Service scan (svcscan + svcdiff)",desc:"Pool scan for all service objects — diff to find hidden services",cat:"Persistence",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.svcscan.SvcScan","vol.py -f memory.dmp windows.svclist.SvcList","vol.py -f memory.dmp windows.malware.svcdiff.SvcDiff"],
+   iocs:["Services in svcscan not in svclist = hidden service (rootkit)","Services with binary paths in temp/appdata","Random or single-character service names","Driver services from non-standard locations"],
+   src:"Event ID 7045, SYSTEM hive CurrentControlSet\\Services"},
+  // ── CREDENTIALS ──
+  {art:"NTLM hashes (hashdump)",desc:"NTLM password hashes from SAM/LSASS memory structures",cat:"Credentials",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.registry.hashdump.Hashdump"],
+   iocs:["Hash reuse across multiple accounts","Well-known default/weak password hashes","Admin account hashes for pass-the-hash lateral movement"],
+   src:"SAM hive + SYSTEM hive (offline cracking via hashcat/john)"},
+  {art:"LSA / cached domain credentials",desc:"LSA secrets and cached domain credentials ($DCC2)",cat:"Credentials",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.registry.lsadump.Lsadump","vol.py -f memory.dmp windows.registry.cachedump.Cachedump"],
+   iocs:["Service account passwords in LSA secrets","$DCC2 hashes for offline cracking","Auto-logon credentials stored in LSA","DPAPI machine keys in LSA secrets"],
+   src:"SECURITY hive (encrypted on disk — requires SYSTEM key)"},
+  {art:"Kerberos tickets (LSASS dump)",desc:"TGTs and service tickets — irreplaceable from memory",cat:"Credentials",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep lsass","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# Offline: mimikatz \"sekurlsa::minidump lsass.dmp\" \"sekurlsa::tickets /export\" exit"],
+   iocs:["Golden ticket — 10-year validity, non-standard encryption","Silver ticket — service ticket with no TGT","Tickets for accounts not currently logged on","Forged PAC data"],
+   src:"None — memory only (tickets expire and cannot be reconstructed)"},
+  {art:"Plaintext credentials (LSASS)",desc:"Cleartext passwords via WDigest, SSP, or CredMan",cat:"Credentials",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# Offline: mimikatz \"sekurlsa::minidump lsass.dmp\" \"sekurlsa::logonpasswords\" exit"],
+   iocs:["Domain admin credentials in LSASS memory","Service account passwords","WDigest enabled (UseLogonCredential=1) = guaranteed cleartext"],
+   src:"None — memory only"},
+  {art:"Process SIDs",desc:"SIDs associated with each process — spot privilege escalation",cat:"Credentials",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.getsids.GetSIDs","vol.py -f memory.dmp windows.getsids.GetSIDs --pid <PID>"],
+   iocs:["Non-admin process carrying SYSTEM SID (S-1-5-18)","Unexpected high-privilege SIDs in user processes","Service SIDs in interactive session processes"],
+   src:"None — memory only"},
+  {art:"DPAPI master keys",desc:"Data Protection API keys for decrypting stored secrets",cat:"Credentials",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# strings on dump | grep -i dpapi"],
+   iocs:["Keys enabling browser credential decryption offline","Keys for RDP saved credential blobs","DPAPI blob exfiltration to decrypt offline"],
+   src:"AppData\\Roaming\\Microsoft\\Protect (disk — encrypted)"},
+  {art:"Browser credentials in memory",desc:"Saved passwords decrypted in browser process heap",cat:"Credentials",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID>","# strings pid.dmp | grep -iE 'password|passwd|login'"],
+   iocs:["Corporate SSO credentials in plaintext","Email and cloud service passwords","VPN and remote access credentials"],
+   src:"Browser SQLite Login Data (DPAPI-encrypted on disk)"},
+  {art:"Skeleton Key detection",desc:"Detects Skeleton Key malware patching LSASS authentication",cat:"Credentials",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.malware.skeleton_key_check.Skeleton_Key_Check"],
+   iocs:["LSASS memory patched to accept a master password","Skeleton Key allows any password for domain auth","Indicator of full domain compromise"],
+   src:"None — memory only"},
+  // ── USER ACTIVITY ──
+  {art:"Clipboard contents",desc:"Clipboard buffer contents at exact time of capture",cat:"User Activity",quality:"Excellent",
+   cmds:["# No native clipboard plugin in Vol3 — dump the owning process","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <PID> -o ./clip_dump/","# strings -el clip_dump/*.dmp | grep -iE '.{8,}' > clipboard_strings.txt"],
+   iocs:["Copied credentials or API keys","Staged exfiltration data","Commands being prepared for execution","Internal IP ranges or hostnames"],
+   src:"None — memory only"},
+  {art:"Console history (cmd.exe)",desc:"Commands typed in cmd.exe — full console buffer",cat:"User Activity",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.consoles.Consoles","vol.py -f memory.dmp windows.cmdscan.CmdScan"],
+   iocs:["Attacker recon (net user, whoami, ipconfig, systeminfo)","Lateral movement commands (net use, wmic, psexec)","Credential harvesting commands","Data staging and exfil commands"],
+   src:"None — memory only (console buffer is volatile)"},
+  {art:"Active sessions / logons",desc:"Logged-in users and session metadata",cat:"User Activity",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.sessions.Sessions","vol.py -f memory.dmp windows.privileges.Privs --pid <PID>","vol.py -f memory.dmp windows.getsids.GetSIDs --pid <PID>"],
+   iocs:["Unexpected interactive sessions","Service accounts with interactive logon type","Multiple simultaneous sessions suggesting hijacking"],
+   src:"Event ID 4624/4634, qwinsta (live)"},
+  {art:"PowerShell history in memory",desc:"PS command history buffer in powershell.exe heap",cat:"User Activity",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <powershell_PID>","# strings pid.dmp | grep -iE 'invoke|iex|bypass|encoded|downloadstring'"],
+   iocs:["Encoded commands (-enc, -EncodedCommand)","Download cradles (IEX, DownloadString, WebClient)","AMSI bypass attempts","Reflective loading patterns"],
+   src:"PSReadLine ConsoleHost_history.txt, Event ID 4104"},
+  {art:"Browser session artifacts",desc:"URLs, cookies, form data in browser process heap",cat:"Browser",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID>","# strings pid.dmp | grep -iE 'https?://|session|cookie|bearer|password'"],
+   iocs:["C2 infrastructure URLs","Session tokens enabling account takeover","OAuth bearer tokens","Incognito activity — no disk trace for these"],
+   src:"Browser SQLite history/cookies (disk — encrypted, no incognito)"},
+  // ── KERNEL ──
+  {art:"Kernel modules (modules/modscan)",desc:"Loaded kernel modules — diff to find hidden drivers",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.modules.Modules","vol.py -f memory.dmp windows.modscan.ModScan","vol.py -f memory.dmp windows.malware.drivermodule.DriverModule"],
+   iocs:["Driver in modscan not in modules = hidden kernel module","Driver loaded from temp or user-writable path","Unsigned driver in kernel space","Known rootkit driver filenames"],
+   src:"Driver signing event logs, SYSTEM hive"},
+  {art:"Driver scan (driverscan)",desc:"Pool scan for DRIVER_OBJECT structures",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.driverscan.DriverScan","vol.py -f memory.dmp windows.devicetree.DeviceTree","vol.py -f memory.dmp windows.driverirp.DriverIrp"],
+   iocs:["Driver objects in pool not in modules list","Unusual device names attached to known drivers","IRP hooks — handler addresses outside driver image"],
+   src:"None — memory only"},
+  {art:"Unloaded kernel modules",desc:"Recently unloaded driver history retained in kernel",cat:"Kernel",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.unloadedmodules.UnloadedModules"],
+   iocs:["Malicious driver loaded then unloaded to cover tracks","Driver name present in unloaded list but not on disk","Timing of unload relative to attack window"],
+   src:"None — memory only"},
+  {art:"MBR scan (bootkit detection)",desc:"Scans for Master Boot Record — bootkit detection",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.mbrscan.MBRScan"],
+   iocs:["Modified MBR code — bootkit infection","Non-standard MBR not matching known Windows signatures","MBR modification during attack window"],
+   src:"Raw disk image (compare against known-good MBR)"},
+  {art:"DKOM artifacts",desc:"Direct Kernel Object Manipulation — object hiding detection",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.psscan.PsScan","vol.py -f memory.dmp windows.filescan.FileScan","vol.py -f memory.dmp windows.malware.svcdiff.SvcDiff"],
+   iocs:["Objects in pool scan absent from list traversal","Manipulated _LIST_ENTRY FLINK/BLINK values","Inconsistent counts between scan and list methods"],
+   src:"None — memory only"},
+  // ── FILE SYSTEM ──
+  {art:"Open file objects (filescan)",desc:"All FILE_OBJECT structures currently in memory",cat:"File System",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.filescan.FileScan","vol.py -f memory.dmp windows.handles.Handles --pid <PID>"],
+   iocs:["Suspicious paths open in legitimate processes","Staging directories with files open","Log files opened by non-logging process (log tampering)"],
+   src:"MFT, filesystem timestamps"},
+  {art:"Memory-cached files (dumpfiles)",desc:"Files cached by Windows cache manager — recoverable",cat:"File System",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.dumpfiles.DumpFiles --dump-dir ./cached_files/","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --virtaddr <addr> --dump-dir ./out/"],
+   iocs:["Deleted malware still in page cache after execution","Exfiltrated documents still in memory","Malware config files cached from disk"],
+   src:"Disk (if not deleted — memory cache may have deleted versions)"},
+  {art:"MFT entries (mftscan)",desc:"MFT FILE records, ADS, and resident data in memory",cat:"File System",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.mftscan.MFTScan","vol.py -f memory.dmp windows.mftscan.ADS","vol.py -f memory.dmp windows.mftscan.ResidentData"],
+   iocs:["Metadata of recently created/modified/deleted files","Alternate Data Streams used for hiding payloads","Timestomped file entries","Files created during attack window"],
+   src:"$MFT on disk (complete — memory is partial/cached only)"},
+  // ── THREAT INTEL ──
+  {art:"Unpacked malware samples",desc:"Packed malware decompressed in memory — cleaner than disk",cat:"Threat Intel",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.malware.malfind.Malfind --dump --dump-dir ./unpacked/","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <PID> --dump-dir ./proc_dump/","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <PID>"],
+   iocs:["Unpacked PE ready for YARA/sandbox/reverse engineering","C2 config strings visible in plaintext post-unpack","Import table reveals full capability profile"],
+   src:"Memory only — disk sample is packed/obfuscated"},
+  {art:"YARA scan",desc:"Pattern match known malware signatures across dump",cat:"Threat Intel",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp yarascan.YaraScan --yara-rules /opt/rules/malware.yar","vol.py -f memory.dmp windows.vadyarascan.VadYaraScan --pid <PID> --yara-rules rules.yar"],
+   iocs:["C2 framework signatures (Cobalt Strike, Sliver, Havoc, Brute Ratel)","Known ransomware patterns","Shellcode byte sequences","Credential dumper signatures (mimikatz, lsassy)"],
+   src:"YARA can also scan disk — memory catches unpacked versions"},
+  {art:"Timeliner (cross-plugin timeline)",desc:"Runs all time-relevant plugins ordered by timestamp",cat:"Threat Intel",quality:"Good",
+   cmds:["vol.py -f memory.dmp timeliner.Timeliner","vol.py -f memory.dmp timeliner.Timeliner --output csv --output-file timeline.csv"],
+   iocs:["Correlated timestamps across processes, files, registry, network","Attack timeline reconstruction from a single command","Chronological ordering of all memory artifacts"],
+   src:"Complement with disk — plaso/log2timeline for full timeline"},
+  {art:"Strings / IOC extraction",desc:"Raw string extraction for IPs, URLs, domains, paths",cat:"Threat Intel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.strings.Strings --strings-file strings.txt","# strings -el memory.dmp | grep -iE 'https?://|HKEY' > iocs.txt","# bulk_extractor -o bulk_out/ memory.dmp"],
+   iocs:["Hardcoded C2 IPs and domain names","Mutex name strings (family fingerprints)","File path staging locations","Registry key strings used for persistence"],
+   src:"Disk artifacts, EDR telemetry — memory catches fileless variants"},
+  {art:"Certutil download cache",desc:"LOLBin download evidence — cmdline + memory buffers",cat:"Threat Intel",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.cmdline.CmdLine | grep -i certutil","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <certutil_PID>","# strings pid.dmp | grep -iE 'http|urlcache|-split|-f'"],
+   iocs:["Download URL in certutil command line","certutil -urlcache -split -f pattern","Downloaded payload content in process memory buffers"],
+   src:"CryptnetUrlCache on disk (Content + MetaData directories)"},
+
+  // ── CREDENTIALS (additional) ──
+  {art:"Kerberos tickets (in-memory)",desc:"Active TGT and service tickets from LSASS memory — Golden/Silver Ticket detection",cat:"Credentials",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.registry.lsadump.Lsadump",
+         "# Dump LSASS for offline mimikatz Kerberos extraction",
+         "vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> -o ./lsass_dump/",
+         "# mimikatz offline: sekurlsa::tickets /export"],
+   iocs:["Ticket lifetime 10 years = Golden Ticket (full domain compromise)","Service ticket with no matching TGT = Silver Ticket","TGT for non-existent account","Ticket issued outside business hours or from unexpected host"],
+   src:"Event ID 4768/4769 (Kerberos), DC security logs"},
+  {art:"Browser saved passwords (memory)",desc:"Decrypted browser credentials in process heap — bypasses DPAPI encryption",cat:"Credentials",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep -iE 'chrome|msedge|firefox'",
+         "vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID> -o ./browser_dump/",
+         "# strings -el browser_dump/*.dmp | grep -iE 'password|passwd|credential|bearer|token'"],
+   iocs:["Cleartext credentials in browser heap — decrypted at runtime","OAuth bearer tokens","Session cookies enabling account takeover without credentials","Credentials for cloud services or internal apps"],
+   src:"Browser Login Data SQLite (DPAPI-encrypted on disk — memory has decrypted version)"},
+  {art:"TrueCrypt passphrase",desc:"Searches memory for TrueCrypt cached passphrases",cat:"Credentials",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.truecrypt.Passphrase"],
+   iocs:["Passphrase for encrypted TrueCrypt/VeraCrypt volume","May reveal encryption key for suspect container","Cached after volume mount — persists in RAM until system restart"],
+   src:"None — memory only (passphrase never written to disk)"},
+
+  // ── PERSISTENCE (additional) ──
+  {art:"Registry cell routine hook",desc:"Detects registry hives with a hooked GetCellRoutine — advanced rootkit technique",cat:"Persistence",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.registry.getcellroutine.GetCellRoutine"],
+   iocs:["GetCellRoutine handler outside ntoskrnl.exe","Rootkit intercepting all registry reads via hive hook","Used to hide persistence keys from enumeration tools"],
+   src:"None — memory only"},
+  {art:"Symlink scan",desc:"Scans for symbolic link objects — used by malware for privilege escalation and hiding",cat:"Persistence",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.symlinkscan.SymlinkScan"],
+   iocs:["Symlinks redirecting legitimate paths to attacker-controlled locations","Object namespace manipulation for privilege escalation","Unusual symlinks created during attack window"],
+   src:"None — memory only"},
+
+  // ── KERNEL (additional) ──
+  {art:"Kernel timers (DPC)",desc:"Registered kernel timer callbacks — malware persistence via DPC routines",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.timers.Timers"],
+   iocs:["Timer callback address outside any known driver module","DPC routine in unallocated or suspicious memory region","Periodic timer with short interval = kernel-level beaconing or watchdog"],
+   src:"None — memory only"},
+  {art:"Orphaned kernel threads",desc:"Kernel threads whose owning process has exited — injected thread survival indicator",cat:"Kernel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.orphan_kernel_threads.Threads"],
+   iocs:["Thread still running after parent process terminated","Injected thread surviving process cleanup","Thread start address in non-module memory — kernel shellcode"],
+   src:"None — memory only"},
+  {art:"Suspended threads",desc:"Enumerates all suspended threads — EDR evasion and process injection staging",cat:"Kernel",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.suspended_threads.SuspendedThreads"],
+   iocs:["Thread suspended indefinitely — injection staging","Legitimate process with all threads suspended = process doppelgänging","Suspended thread with start address in injected memory"],
+   src:"None — memory only"},
+  {art:"Big page pool scan",desc:"Scans large pool allocations — evasive rootkits avoid small pool tags",cat:"Kernel",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.bigpools.BigPools"],
+   iocs:["Large anonymous allocations not attributable to known drivers","Executable memory in large pool outside normal kernel ranges","Pool tags with unusual or random names in large allocations"],
+   src:"None — memory only"},
+  {art:"Window stations and desktops",desc:"Enumerates Window Stations and Desktop objects — privilege escalation and session hijacking",cat:"Kernel",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.windowstations.WindowStations",
+         "vol.py -f memory.dmp windows.desktops.Desktops",
+         "vol.py -f memory.dmp windows.deskscan.DeskScan",
+         "vol.py -f memory.dmp windows.windows.Windows"],
+   iocs:["Processes attached to unexpected Window Stations","Malware operating in Service-0 station (winlogon context)","Additional desktops created for covert activity","Process with GUI in hidden desktop"],
+   src:"None — memory only"},
+
+  // ── PROCESS (additional) ──
+  {art:"PE version info",desc:"Version strings from loaded PE files — detects masquerading via fake version info",cat:"Process",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.verinfo.VerInfo",
+         "vol.py -f memory.dmp windows.verinfo.VerInfo --pid <PID>"],
+   iocs:["Version info absent in PE claiming to be a Microsoft binary","Version strings inconsistent with stated product","Malware mimicking svchost.exe but with no Microsoft copyright","FileVersion mismatch between PE header and FileVersionInfo resource"],
+   src:"PE file on disk (compare in-memory version with on-disk version)"},
+  {art:"Job links",desc:"Windows Job Objects — containment escape and privilege context detection",cat:"Process",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.joblinks.JobLinks"],
+   iocs:["Process escaping from sandboxed Job Object","Malware adding itself to a Job to survive parent termination","Job object with unusual limits or permissions"],
+   src:"None — memory only"},
+  {art:"PE dump (pedump)",desc:"Dump PE file from a specific in-memory address — precise extraction for analysis",cat:"Threat Intel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.pedump.PEDump --pid <PID> --base <base_addr> -o ./pe_out/",
+         "# Get base address from dlllist or vadinfo output first",
+         "vol.py -f memory.dmp windows.dlllist.DllList --pid <PID>"],
+   iocs:["Precise extraction of injected PE at known base address","More accurate than malfind dumps for PE reconstruction","Use when malfind dump is incomplete or truncated"],
+   src:"None — memory only (disk version may be packed/different)"},
+  {art:"PE symbols",desc:"Exports and imports from in-memory PE files — capability profiling",cat:"Threat Intel",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.pe_symbols.PESymbols --pid <PID>",
+         "vol.py -f memory.dmp windows.pe_symbols.PESymbols --pid <PID> --module <module.dll>"],
+   iocs:["Imports of VirtualAlloc+WriteProcessMemory+CreateRemoteThread = injection capability","Exports suggesting C2 framework (beacon, implant, stager)","Missing standard imports for stated process type","Suspicious export names in injected DLL"],
+   src:"Disk PE (compare — in-memory imports may differ if hooked or patched)"},
+  {art:"Service SIDs (GetServiceSIDs)",desc:"Service security identifiers — detects services running under unexpected accounts",cat:"Persistence",quality:"Partial",
+   cmds:["vol.py -f memory.dmp windows.getservicesids.GetServiceSIDs"],
+   iocs:["Service SID running under SYSTEM when expected to use NetworkService","Newly created service SID not in baseline","SID associated with a service name inconsistent with legitimate software"],
+   src:"SYSTEM hive Services key, Event ID 7045"},
+
+  // ── NETWORK (additional) ──
+  {art:"Named pipe enumeration",desc:"Named pipes — C2 channels for Cobalt Strike SMB beacon, PsExec, and WMI",cat:"Network",quality:"Good",
+   cmds:["vol.py -f memory.dmp windows.handles.Handles --pid <PID>",
+         "# Filter handles output for pipe type",
+         "# vol.py -f memory.dmp windows.handles.Handles | grep -i pipe"],
+   iocs:["Pipe names matching Cobalt Strike defaults (e.g. \\MSSE-*, \\postex_*, \\msagent_*)","PsExec pipe: \\PSEXESVC","Named pipe C2 channel instead of TCP — evades network monitoring","Unexpected pipe between two unrelated processes"],
+   src:"Sysmon Event ID 17/18 (pipe created/connected), live pipelist.exe"},
+
+  // ── THREAT INTEL (additional) ──
+  {art:"Regex scan across dump",desc:"RegEx search across kernel and process memory — flexible IOC hunting",cat:"Threat Intel",quality:"Good",
+   cmds:["vol.py -f memory.dmp regexscan.RegExScan --pattern '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'",
+         "vol.py -f memory.dmp windows.vadregexscan.VadRegExScan --pid <PID> --pattern 'https?://[^ ]+'",
+         "# Hunt for encoded PowerShell",
+         "vol.py -f memory.dmp windows.vadregexscan.VadRegExScan --pid <PS_PID> --pattern '[A-Za-z0-9+/]{50,}={0,2}'"],
+   iocs:["C2 IP addresses hardcoded in process memory","Encoded payloads (base64 blocks) in PowerShell heap","DGA domain patterns — high-entropy hostname strings","Registry key strings used for persistence"],
+   src:"strings + grep (less precise — no PID attribution)"},
+];
+
+/* MATRIX LOGIC */
+let activeFilters = new Set();
+let searchVal = "";
+let sortCol = 0;
+let sortDir = 1;
+
+function catColor(cat){ return CATS[cat] || "#888"; }
+function qualInfo(q){ return QUAL[q] || {color:"#888",bars:1}; }
+
+function renderBars(q){
+  const {color,bars} = qualInfo(q);
+  return Array.from({length:5},(_,i) =>
+    `<span class="bar" style="${i<bars?'background:'+color:''}"></span>`
+  ).join("");
+}
+
+function buildFilters(){
+  const wrap = document.getElementById("cat-filters");
+  const cats = [...new Set(DATA.map(d=>d.cat))];
+  wrap.innerHTML =
+    `<button class="fbtn active" onclick="toggleFilter('ALL',this)">All</button>` +
+    cats.map(c =>
+      `<button class="fbtn" onclick="toggleFilter('${c}',this)" style="border-color:${catColor(c)}44">${c}</button>`
+    ).join("");
+}
+
+function toggleFilter(cat, btn){
+  if(cat === "ALL"){
+    activeFilters.clear();
+    document.querySelectorAll(".fbtn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  } else {
+    document.querySelector(".fbtn").classList.remove("active");
+    if(activeFilters.has(cat)){ activeFilters.delete(cat); btn.classList.remove("active"); }
+    else { activeFilters.add(cat); btn.classList.add("active"); }
+    if(activeFilters.size === 0) document.querySelector(".fbtn").classList.add("active");
+  }
+  applyFilters();
+}
+
+function applyFilters(){
+  searchVal = document.getElementById("search").value.toLowerCase();
+  let visible = 0;
+  document.querySelectorAll("tbody tr[data-cat]").forEach(tr => {
+    const catOk = activeFilters.size === 0 || activeFilters.has(tr.dataset.cat);
+    const searchOk = !searchVal || tr.dataset.text.includes(searchVal);
+    if(catOk && searchOk){ tr.classList.remove("row-hidden"); visible++; }
+    else { tr.classList.add("row-hidden"); }
+  });
+  document.getElementById("empty-state").style.display = visible === 0 ? "block" : "none";
+  document.getElementById("matrix-table").style.display = visible === 0 ? "none" : "";
+  document.getElementById("row-count").textContent = visible + " of " + DATA.length + " artifacts shown";
+}
+
+function sortBy(col){
+  if(sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  document.querySelectorAll("thead th").forEach((th,i) => {
+    th.classList.remove("sort-asc","sort-desc");
+    if(i === col) th.classList.add(sortDir === 1 ? "sort-asc" : "sort-desc");
+  });
+  const tbody = document.getElementById("matrix-body");
+  const rows = [...tbody.querySelectorAll("tr[data-cat]")];
+  rows.sort((a,b) => {
+    let av = a.dataset["sort"+col] || "";
+    let bv = b.dataset["sort"+col] || "";
+    if(col === 2){ av = QUAL_ORDER[av]||0; bv = QUAL_ORDER[bv]||0; return sortDir*(bv-av); }
+    return sortDir * av.localeCompare(bv);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+function buildTable(){
+  const tbody = document.getElementById("matrix-body");
+  document.getElementById("total-count").textContent = DATA.length;
+  tbody.innerHTML = DATA.map(d => {
+    const q = qualInfo(d.quality);
+    const iocHtml = d.iocs.map(i =>
+      `<div class="ioc-item"><span class="ioc-dot" style="background:${q.color}"></span><span>${i}</span></div>`
+    ).join("");
+    const cmdsHtml = d.cmds.map(c => `<span class="vol-cmd">${c}</span>`).join("");
+    const searchText = [d.art, d.desc, d.cat, ...d.cmds, ...d.iocs, d.quality, d.src].join(" ").toLowerCase();
+    const cc = catColor(d.cat);
+    return `<tr data-cat="${d.cat}" data-text="${searchText}"
+      data-sort0="${d.art}" data-sort1="${d.cat}" data-sort2="${d.quality}" data-sort5="${d.src}">
+      <td><div class="art-name">${d.art}</div><div class="art-desc">${d.desc}</div></td>
+      <td><span class="cat-badge" style="background:${cc}18;color:${cc}">${d.cat}</span></td>
+      <td><div class="quality-cell"><span class="dot" style="background:${q.color}"></span>${d.quality}</div><div class="bars">${renderBars(d.quality)}</div></td>
+      <td>${cmdsHtml}</td>
+      <td class="ioc-cell">${iocHtml}</td>
+      <td><span class="source-pill" style="color:${cc};border-color:${cc}55;background:${cc}10">${d.src}</span></td>
+    </tr>`;
+  }).join("");
+  document.getElementById("row-count").textContent = DATA.length + " of " + DATA.length + " artifacts shown";
+}
+
+buildFilters();
+buildTable();
+
+/* OS TOGGLE */
+function switchOS(os) {
+  document.getElementById('os-linux').style.display = os === 'linux' ? 'block' : 'none';
+  document.getElementById('os-windows').style.display = os === 'windows' ? 'block' : 'none';
+  document.getElementById('btn-linux').classList.toggle('active', os === 'linux');
+  document.getElementById('btn-windows').classList.toggle('active', os === 'windows');
+}
+
+</script>
+
+<!-- ═══ TAB 4: INSTALLATION GUIDE ═══ -->
+<div id="tab-install" class="tab-panel">
+<div class="content-page">
+  <h2>Installation Guide</h2>
+  <p class="page-sub">Step-by-step setup for Volatility 3 on Windows and Linux, including Python requirements, symbol tables, and recommended supporting tools.</p>
+
+  <!-- OS TOGGLE -->
+  <div style="display:flex;gap:8px;margin-bottom:1.75rem">
+    <button class="os-btn active" id="btn-linux" onclick="switchOS('linux')">Linux</button>
+    <button class="os-btn" id="btn-windows" onclick="switchOS('windows')">Windows</button>
+  </div>
+
+  <!-- ══ LINUX ══ -->
+  <div id="os-linux">
+
+    <div class="install-section">
+      <div class="install-section-title">1 &mdash; Prerequisites</div>
+      <p class="install-p">Volatility 3 requires Python 3.8 or later. Most modern Linux distributions ship with a suitable version. Verify before proceeding.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Check Python version</div>
+        <code class="cmd-comment"># Must be 3.8 or higher</code>
+        <code class="cmd-line">python3 --version</code>
+        <code class="cmd-comment"># Install pip if missing</code>
+        <code class="cmd-line">sudo apt install python3-pip python3-venv -y   # Debian/Ubuntu</code>
+        <code class="cmd-line">sudo dnf install python3-pip -y               # Fedora/RHEL</code>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">2 &mdash; Clone and install Volatility 3</div>
+      <p class="install-p">The recommended approach is to clone from GitHub and install into a Python virtual environment to keep dependencies isolated from your system Python.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Clone and set up</div>
+        <code class="cmd-comment"># Clone the repository</code>
+        <code class="cmd-line">git clone https://github.com/volatilityfoundation/volatility3.git</code>
+        <code class="cmd-line">cd volatility3</code>
+        <code class="cmd-comment"># Create and activate a virtual environment (recommended)</code>
+        <code class="cmd-line">python3 -m venv venv</code>
+        <code class="cmd-line">source venv/bin/activate</code>
+        <code class="cmd-comment"># Fix ownership if cloned to /opt as root (common on Kali)</code>
+        <code class="cmd-line">sudo chown -R $USER:$USER /opt/volatility3</code>
+        <code class="cmd-comment"># Install Volatility 3 and all dependencies (no sudo needed after chown)</code>
+        <code class="cmd-line">pip install -e &quot;.[full]&quot;</code>
+        <code class="cmd-comment"># Verify installation</code>
+        <code class="cmd-line">python3 vol.py --version</code>
+      </div>
+      <div class="install-note">
+        <strong>Alternative — pip install (no git clone):</strong><br>
+        <code style="font-family:var(--mono);font-size:11px">pip install volatility3</code> installs the latest release from PyPI. The GitHub clone is preferred for DFIR work as it includes the latest plugin updates between releases.
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">3 &mdash; Symbol tables (ISF files)</div>
+      <p class="install-p">Volatility 3 requires Intermediate Symbol Files (ISF) to parse kernel structures. Without the correct symbol table for the target OS, most plugins will fail. There are two ways to get them.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option A — Download pre-built symbol packs (recommended)</div>
+        <code class="cmd-comment"># Create the symbols directory</code>
+        <code class="cmd-line">mkdir -p volatility3/symbols</code>
+        <code class="cmd-comment"># Download Windows symbol pack from Volatility Foundation</code>
+        <code class="cmd-comment"># https://downloads.volatilityfoundation.org/volatility3/symbols/windows.zip</code>
+        <code class="cmd-line">wget https://downloads.volatilityfoundation.org/volatility3/symbols/windows.zip</code>
+        <code class="cmd-line">unzip windows.zip -d volatility3/symbols/</code>
+        <code class="cmd-comment"># Also grab Linux and macOS packs if needed</code>
+        <code class="cmd-line">wget https://downloads.volatilityfoundation.org/volatility3/symbols/linux.zip</code>
+        <code class="cmd-line">wget https://downloads.volatilityfoundation.org/volatility3/symbols/mac.zip</code>
+        <code class="cmd-line">unzip linux.zip -d volatility3/symbols/</code>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option B — Auto-download at runtime</div>
+        <code class="cmd-comment"># Vol3 can attempt to fetch the right symbol table automatically</code>
+        <code class="cmd-comment"># when it identifies the image — requires internet access</code>
+        <code class="cmd-line">python3 vol.py -f memory.dmp windows.info</code>
+        <code class="cmd-comment"># If auto-download fails, Vol3 will print the exact ISF URL to fetch manually</code>
+      </div>
+      <div class="install-note">
+        <strong>Symbol table location:</strong> Vol3 searches <code style="font-family:var(--mono);font-size:11px">volatility3/symbols/</code> by default. You can also set the environment variable <code style="font-family:var(--mono);font-size:11px">VOLATILITY_SYMBOL_PATH</code> to point to a custom directory, useful when maintaining a central symbol store across multiple installations.
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">4 &mdash; Recommended supporting tools</div>
+      <p class="install-p">Volatility alone covers the analysis side. These tools handle acquisition, post-extraction analysis, and IOC enrichment.</p>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">LiME</div>
+          <div class="tool-desc">Linux Memory Extractor — loadable kernel module for live Linux memory acquisition</div>
+          <code class="tool-cmd">git clone https://github.com/504ensicsLabs/LiME</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">strings / binutils</div>
+          <div class="tool-desc">Raw string extraction from memory dumps and dumped process images</div>
+          <code class="tool-cmd">sudo apt install binutils -y</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">YARA</div>
+          <div class="tool-desc">Pattern matching engine for scanning dumps against malware rule sets</div>
+          <code class="tool-cmd">sudo apt install yara python3-yara -y</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">capa</div>
+          <div class="tool-desc">Mandiant tool — extracts capabilities from dumped PE files without full reversing</div>
+          <code class="tool-cmd">pip install flare-capa</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">bulk_extractor</div>
+          <div class="tool-desc">Bulk IOC extraction — IPs, domains, emails, URLs from raw image files</div>
+          <code class="tool-cmd">sudo apt install bulk-extractor -y</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">Volatility 3 community plugins</div>
+          <div class="tool-desc">Third-party plugins including backports of some Vol2 functionality</div>
+          <code class="tool-cmd">git clone https://github.com/volatilityfoundation/community3</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">5 &mdash; Verify everything works</div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Quick smoke test</div>
+        <code class="cmd-comment"># Activate venv if not already active</code>
+        <code class="cmd-line">source volatility3/venv/bin/activate</code>
+        <code class="cmd-comment"># Run against a test image — should print OS info without errors</code>
+        <code class="cmd-line">python3 vol.py -f /path/to/memory.dmp windows.info</code>
+        <code class="cmd-comment"># List all available plugins</code>
+        <code class="cmd-line">python3 vol.py --help 2&gt;&amp;1 | grep windows\.</code>
+        <code class="cmd-comment"># Check YARA support is active</code>
+        <code class="cmd-line">python3 vol.py -f /path/to/memory.dmp yarascan.YaraScan --help</code>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">6 &mdash; Set up the <code style="font-size:13px;font-family:var(--mono)">vol</code> command (skip typing python3 every time)</div>
+      <p class="install-p">Three options — pick whichever suits your workflow. The wrapper script is the most robust as it survives shell reloads and works across all terminals.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option A — Shell alias (quick, per-session or persistent)</div>
+        <code class="cmd-comment"># Add to ~/.bashrc or ~/.zshrc for persistence</code>
+        <code class="cmd-line">echo 'alias vol="source /opt/volatility3/venv/bin/activate && python3 /opt/volatility3/vol.py"' >> ~/.bashrc</code>
+        <code class="cmd-line">source ~/.bashrc</code>
+        <code class="cmd-comment"># Now just run:</code>
+        <code class="cmd-line">vol -f memory.dmp windows.info</code>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option B — Wrapper script in /usr/local/bin (recommended)</div>
+        <code class="cmd-comment"># Create the wrapper script</code>
+        <code class="cmd-line">sudo tee /usr/local/bin/vol &gt; /dev/null &lt;&lt; 'EOF'
+#!/bin/bash
+source /opt/volatility3/venv/bin/activate
+exec python3 /opt/volatility3/vol.py "$@"
+EOF</code>
+        <code class="cmd-line">sudo chmod +x /usr/local/bin/vol</code>
+        <code class="cmd-comment"># Verify it works from any directory</code>
+        <code class="cmd-line">vol --version</code>
+        <code class="cmd-line">vol -f /path/to/memory.dmp windows.info</code>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option C — Symlink (only works if venv is always active)</div>
+        <code class="cmd-comment"># Only use this if you always activate the venv before working</code>
+        <code class="cmd-line">sudo ln -s /opt/volatility3/venv/bin/python3 /usr/local/bin/vol-python</code>
+        <code class="cmd-comment"># Then set alias to use the venv python directly</code>
+        <code class="cmd-line">echo 'alias vol="vol-python /opt/volatility3/vol.py"' >> ~/.bashrc</code>
+      </div>
+      <div class="install-note">
+        <strong>Recommended:</strong> Option B (wrapper script) is the most reliable. It activates the venv automatically every time, works from any directory, survives terminal restarts, and does not require you to remember to run <code style="font-family:var(--mono);font-size:11px">source activate</code> first. After setting it up, all examples in this reference that show <code style="font-family:var(--mono);font-size:11px">python3 vol.py</code> can be run as just <code style="font-family:var(--mono);font-size:11px">vol</code>.
+      </div>
+    </div>
+
+  </div><!-- end os-linux -->
+
+  <!-- ══ WINDOWS ══ -->
+  <div id="os-windows" style="display:none">
+
+    <div class="install-section">
+      <div class="install-section-title">1 &mdash; Prerequisites</div>
+      <p class="install-p">Volatility 3 requires Python 3.8 or later. Download from python.org — ensure you check <strong>Add Python to PATH</strong> during installation, otherwise you will need to reference the full Python executable path every time.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Verify Python in PowerShell or cmd</div>
+        <code class="cmd-comment"># Must be 3.8 or higher</code>
+        <code class="cmd-line">python --version</code>
+        <code class="cmd-comment"># Verify pip is available</code>
+        <code class="cmd-line">pip --version</code>
+        <code class="cmd-comment"># If python not found, try the full launcher</code>
+        <code class="cmd-line">py -3 --version</code>
+      </div>
+      <div class="install-note">
+        <strong>Recommended:</strong> Install Git for Windows from <code style="font-family:var(--mono);font-size:11px">git-scm.com</code> so you can clone repositories. The installer includes Git Bash which provides a Unix-like shell — many Vol3 workflows (piping to strings, grep etc.) work more naturally there than in cmd or PowerShell.
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">2 &mdash; Clone and install Volatility 3</div>
+      <p class="install-p">Run these commands in PowerShell or Git Bash. Using a virtual environment is strongly recommended to keep dependencies isolated.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">PowerShell / Git Bash</div>
+        <code class="cmd-comment"># Clone the repository</code>
+        <code class="cmd-line">git clone https://github.com/volatilityfoundation/volatility3.git</code>
+        <code class="cmd-line">cd volatility3</code>
+        <code class="cmd-comment"># Create and activate a virtual environment</code>
+        <code class="cmd-line">python -m venv venv</code>
+        <code class="cmd-line">venv\Scriptsctivate          # cmd / PowerShell</code>
+        <code class="cmd-line">source venv/Scripts/activate   # Git Bash</code>
+        <code class="cmd-comment"># Fix ownership if cloned to /opt as root (common on Kali)</code>
+        <code class="cmd-line">sudo chown -R $USER:$USER /opt/volatility3</code>
+        <code class="cmd-comment"># Install Volatility 3 and all dependencies (no sudo needed after chown)</code>
+        <code class="cmd-line">pip install -e &quot;.[full]&quot;</code>
+        <code class="cmd-comment"># Verify installation</code>
+        <code class="cmd-line">python vol.py --version</code>
+      </div>
+      <div class="install-note">
+        <strong>If pip install fails on Windows:</strong> Some dependencies (particularly <code style="font-family:var(--mono);font-size:11px">pycryptodome</code>) need a C compiler. Install the <strong>Microsoft C++ Build Tools</strong> from the Visual Studio installer (select &ldquo;Desktop development with C++&rdquo; workload), then retry <code style="font-family:var(--mono);font-size:11px">pip install -e &quot;.[full]&quot;</code>.
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">3 &mdash; Symbol tables (ISF files)</div>
+      <p class="install-p">Symbol tables are required for Vol3 to parse kernel structures. Without the correct ISF for the target OS build, most plugins will refuse to run or produce no output.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Download and place symbol packs</div>
+        <code class="cmd-comment"># Download Windows symbol pack from:</code>
+        <code class="cmd-comment"># https://downloads.volatilityfoundation.org/volatility3/symbols/windows.zip</code>
+        <code class="cmd-comment"># Extract into the symbols directory inside your Vol3 clone:</code>
+        <code class="cmd-line">Expand-Archive windows.zip -DestinationPath volatility3\symbols\</code>
+        <code class="cmd-comment"># Linux symbols (if analysing Linux images on Windows)</code>
+        <code class="cmd-comment"># https://downloads.volatilityfoundation.org/volatility3/symbols/linux.zip</code>
+        <code class="cmd-line">Expand-Archive linux.zip -DestinationPath volatility3\symbols\</code>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Custom symbol path via environment variable</div>
+        <code class="cmd-comment"># Set a persistent custom symbol path in PowerShell</code>
+        <code class="cmd-line">[Environment]::SetEnvironmentVariable(&quot;VOLATILITY_SYMBOL_PATH&quot;, &quot;C:\symbols&quot;, &quot;User&quot;)</code>
+        <code class="cmd-comment"># Or set it per-session</code>
+        <code class="cmd-line">:VOLATILITY_SYMBOL_PATH = &quot;C:\symbols&quot;</code>
+      </div>
+      <div class="install-note">
+        <strong>Where to put symbol files:</strong> Place extracted <code style="font-family:var(--mono);font-size:11px">.json.xz</code> files in <code style="font-family:var(--mono);font-size:11px">volatility3olatility3\symbols\windows\</code>. Vol3 will scan this directory recursively at runtime. If you see <em>&ldquo;No suitable address space mapping found&rdquo;</em> it almost always means the correct symbol table is missing.
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">4 &mdash; Memory acquisition tools for Windows</div>
+      <p class="install-p">For live acquisition from a Windows target, these tools create the memory dump that Volatility then analyses. Run acquisition tools as Administrator.</p>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">winpmem</div>
+          <div class="tool-desc">Open-source Windows memory acquirer — part of the original Rekall project, still maintained independently</div>
+          <code class="tool-cmd">winpmem_mini_x64.exe memory.dmp</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">DumpIt</div>
+          <div class="tool-desc">Single-executable memory acquirer by Comae — simple, reliable, widely used in IR engagements</div>
+          <code class="tool-cmd">DumpIt.exe /O memory.dmp</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">FTK Imager</div>
+          <div class="tool-desc">GUI tool from Exterro — acquire memory and disk images; also supports parsing live systems</div>
+          <code class="tool-cmd"># File → Capture Memory → select output path</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">Magnet RAM Capture</div>
+          <div class="tool-desc">Free, lightweight GUI acquirer from Magnet Forensics — good for quick triage</div>
+          <code class="tool-cmd"># Run as Admin, select output path, click Capture</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">5 &mdash; Recommended supporting tools</div>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">YARA for Windows</div>
+          <div class="tool-desc">Download pre-built binaries from the YARA GitHub releases page</div>
+          <code class="tool-cmd">pip install yara-python</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">capa</div>
+          <div class="tool-desc">Mandiant capability extractor — Windows binary available on GitHub releases</div>
+          <code class="tool-cmd">pip install flare-capa</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">strings (Sysinternals)</div>
+          <div class="tool-desc">Microsoft Sysinternals strings.exe — equivalent of Unix strings for Windows</div>
+          <code class="tool-cmd">strings64.exe -accepteula memory.dmp</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">Volatility 3 community plugins</div>
+          <div class="tool-desc">Third-party plugin repo — some Vol2 backports and extra Windows plugins</div>
+          <code class="tool-cmd">git clone https://github.com/volatilityfoundation/community3</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">6 &mdash; Verify everything works</div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Smoke test in PowerShell or Git Bash</div>
+        <code class="cmd-comment"># Activate venv first</code>
+        <code class="cmd-line">venv\Scriptsctivate</code>
+        <code class="cmd-comment"># Run against a test image — should print OS info</code>
+        <code class="cmd-line">python vol.py -f C:\cases\memory.dmp windows.info</code>
+        <code class="cmd-comment"># List available windows plugins</code>
+        <code class="cmd-line">python vol.py --help 2&gt;&amp;1 | Select-String &quot;windows\.&quot;</code>
+        <code class="cmd-comment"># Test YARA support</code>
+        <code class="cmd-line">python vol.py -f C:\cases\memory.dmp yarascan.YaraScan --help</code>
+      </div>
+    </div>
+
+    <div class="install-section">
+      <div class="install-section-title">7 &mdash; Set up the <code style="font-size:13px;font-family:var(--mono)">vol</code> command on Windows</div>
+      <p class="install-p">On Windows you can create a batch file wrapper so you can type <code style="font-family:var(--mono);font-size:12px">vol</code> from any directory instead of specifying the full python path each time.</p>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option A — Batch file wrapper (PowerShell / cmd)</div>
+        <code class="cmd-comment"># Create a vol.bat in a folder already on your PATH (e.g. C:\Windows\System32 or C:	ools)</code>
+        <code class="cmd-comment"># Run this in PowerShell as Administrator:</code>
+        <code class="cmd-line">$bat = @'
+@echo off
+call C:\opt\volatility3env\Scriptsctivate.bat
+python C:\opt\volatility3\vol.py %*
+'@
+$bat | Set-Content "C:\Windows\System32\vol.bat"</code>
+        <code class="cmd-comment"># Now from any cmd or PowerShell window:</code>
+        <code class="cmd-line">vol -f C:\cases\memory.dmp windows.info</code>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-block-label">Option B — PowerShell alias (persistent via profile)</div>
+        <code class="cmd-comment"># Add a persistent function to your PowerShell profile</code>
+        <code class="cmd-line">Add-Content $PROFILE 'function vol { & "C:\opt\volatility3\venv\Scripts\python.exe" "C:\opt\volatility3\vol.py" @args }'</code>
+        <code class="cmd-comment"># Reload profile</code>
+        <code class="cmd-line">. $PROFILE</code>
+        <code class="cmd-comment"># Now just run:</code>
+        <code class="cmd-line">vol -f C:\cases\memory.dmp windows.pslist.PsList</code>
+      </div>
+      <div class="install-note">
+        <strong>Note:</strong> Adjust the paths (<code style="font-family:var(--mono);font-size:11px">C:\opt\volatility3</code>) to wherever you cloned Volatility. Option B (PowerShell function) is cleaner for PowerShell-only workflows; Option A (batch file) works in both cmd and PowerShell.
+      </div>
+    </div>
+
+  </div><!-- end os-windows -->
+
+  <!-- COMMON TROUBLESHOOTING -->
+  <div class="install-section" style="margin-top:2rem">
+    <div class="install-section-title" style="color:var(--text)">Common issues &amp; fixes</div>
+    <div class="trouble-table-wrap">
+      <table class="trouble-table">
+        <thead><tr><th>Error / symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">No suitable address space mapping found</code></td>
+            <td>Missing or wrong symbol table for the target OS build</td>
+            <td>Download the correct Windows symbol pack and place in <code style="font-family:var(--mono);font-size:11px">volatility3/symbols/</code></td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">ImportError: No module named 'yara'</code></td>
+            <td>yara-python not installed in active venv</td>
+            <td><code style="font-family:var(--mono);font-size:11px">pip install yara-python</code></td>
+          </tr>
+          <tr>
+            <td>Plugin returns zero results</td>
+            <td>Wrong plugin for the OS, or symbol table mismatch</td>
+            <td>Run <code style="font-family:var(--mono);font-size:11px">windows.info</code> first — confirm OS and build, then re-run plugin</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">Unsatisfied requirement windows.KernelModule</code></td>
+            <td>Vol3 cannot locate the kernel in the dump — often a partial or hibernation file</td>
+            <td>Ensure the dump is a full RAM image, not a crash dump or hiberfil.sys</td>
+          </tr>
+          <tr>
+            <td>Very slow on large dumps (&gt;32GB)</td>
+            <td>Vol3 rebuilds its internal page map on each run by default</td>
+            <td>Add <code style="font-family:var(--mono);font-size:11px">-v</code> to see progress; consider <code style="font-family:var(--mono);font-size:11px">--cache</code> options for repeated runs on the same image</td>
+          </tr>
+          <tr>
+            <td><code style="font-family:var(--mono);font-size:11px">windows.hashdump returns no results</code></td>
+            <td>SAM hive not loaded or SYSTEM hive missing from dump</td>
+            <td>Run <code style="font-family:var(--mono);font-size:11px">windows.registry.hivelist</code> to confirm both SAM and SYSTEM hives are present</td>
+          </tr>
+          <tr>
+            <td>Plugin not found / no such plugin</td>
+            <td>Using a deprecated or renamed plugin (e.g. windows.malfind → windows.malware.malfind, windows.hashdump → windows.registry.hashdump, connections/apihooks are Vol2 only)</td>
+            <td>See the Vol3 equivalents documented throughout this reference — many Vol2 plugins were renamed or replaced</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- end content-page -->
+</div><!-- end tab-install -->
+
+</body>
+</html>
