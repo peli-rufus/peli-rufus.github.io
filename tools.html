@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tools — DFIR Engineer</title>
+  <title>Tools — Peligey Rufus</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/img/favicon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -117,6 +120,12 @@
       .tools-notice { grid-column:span 1; }
     }
     @media(max-width:600px) { .tools-stats { gap:1rem; } }
+    @media(max-width:480px) {
+      .tool-full-header { flex-wrap: wrap; }
+      .tool-status { margin-left: 0; }
+      .tools-page-header { flex-direction: column; align-items: stretch; }
+      .gh-link { justify-content: center; }
+    }
   </style>
 </head>
 <body>
@@ -124,7 +133,7 @@
 
   <nav class="nav" id="nav">
     <div class="nav-inner">
-      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <a href="index.html" class="nav-logo"><img src="assets/img/nav-icon.png" alt="" class="nav-logo-icon"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="index.html" class="nav-link">~/home</a></li>
         <li><a href="articles.html" class="nav-link">~/articles</a></li>
@@ -182,7 +191,7 @@
 
   <footer class="footer">
     <div class="container"><div class="footer-inner">
-      <span class="footer-logo">[pelirufus.sh]</span>
+      <span class="footer-logo"><img src="assets/img/nav-icon.png" alt="" class="footer-logo-icon">[pelirufus.sh]</span>
       <span class="footer-copy">Built with coffee and curiosity &middot; Hosted on GitHub Pages</span>
       <span class="footer-tag">// stay curious. stay dangerous.</span>
     </div></div>

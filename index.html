@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>DFIR Engineer — Portfolio</title>
+  <title>Peligey Rufus</title>
   <meta name="description" content="Digital Forensics & Incident Response Engineer — Portfolio, Articles, and Tools">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/img/favicon-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -37,7 +40,7 @@
 
   <nav class="nav" id="nav">
     <div class="nav-inner">
-      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <a href="index.html" class="nav-logo"><img src="assets/img/nav-icon.png" alt="" class="nav-logo-icon"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="index.html" class="nav-link active">~/home</a></li>
         <li><a href="articles.html" class="nav-link">~/articles</a></li>
@@ -78,11 +81,11 @@
       </div>
     </div>
     <div class="hero-stats">
-      <div class="stat"><span class="stat-num" data-target="20">0</span><span class="stat-suffix">+</span><span class="stat-label">Incidents Worked</span></div>
+      <div class="stat"><span class="stat-num" id="stat-incidents" data-target="20">0</span><span class="stat-suffix">+</span><span class="stat-label">Incidents Worked</span></div>
       <div class="stat-divider"></div>
-      <div class="stat"><span class="stat-num" data-target="2">0</span><span class="stat-suffix">+</span><span class="stat-label">Tools Built</span></div>
+      <div class="stat"><span class="stat-num" id="stat-tools" data-target="0">0</span><span class="stat-suffix">+</span><span class="stat-label">Tools Built</span></div>
       <div class="stat-divider"></div>
-      <div class="stat"><span class="stat-num" data-target="4">0</span><span class="stat-suffix">+</span><span class="stat-label">Years Experience</span></div>
+      <div class="stat"><span class="stat-num" id="stat-years" data-target="0">0</span><span class="stat-suffix">+</span><span class="stat-label">Years Experience</span></div>
     </div>
   </section>
 
@@ -208,7 +211,7 @@
   </section>
 
   <footer class="footer">
-    <div class="container"><div class="footer-inner"><span class="footer-logo">[pelirufus.sh]</span><span class="footer-copy">Built with coffee and curiosity</span><span class="footer-tag">// stay curious. stay dangerous.</span></div></div>
+    <div class="container"><div class="footer-inner"><span class="footer-logo"><img src="assets/img/nav-icon.png" alt="" class="footer-logo-icon">[pelirufus.sh]</span><span class="footer-copy">Built with coffee and curiosity</span><span class="footer-tag">// stay curious. stay dangerous.</span></div></div>
   </footer>
 
   <script src="assets/js/main.js"></script>
@@ -218,6 +221,21 @@
      1. Field Notes  → posts/index.json (same source as articles.html)
      2. Arsenal      → GitHub API (3 most recently pushed repos)
   ═══════════════════════════════════════════════ */
+
+  /* ── CAREER STATS — years auto-increments every new year ── */
+  const CAREER_START_YEAR = 2021;
+  document.getElementById('stat-years').dataset.target = new Date().getFullYear() - CAREER_START_YEAR;
+
+  // Animate a single stat independently of the scroll-triggered counter in main.js
+  function animateStat(el, target) {
+    const dur = 1200, t0 = performance.now();
+    function step(now) {
+      const p = Math.min((now - t0) / dur, 1);
+      el.textContent = Math.round((1 - Math.pow(1 - p, 3)) * target);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
 
   /* ── CONFIG — update these two values ────────── */
   const GITHUB_USERNAME = 'peli-rufus';          // ← your GitHub username
@@ -308,6 +326,11 @@
       if (GITHUB_TOPIC) {
         repos = repos.filter(r => r.topics && r.topics.includes(GITHUB_TOPIC));
       }
+
+      // Update the "Tools Built" stat with the real, live count
+      const toolsStatEl = document.getElementById('stat-tools');
+      toolsStatEl.dataset.target = repos.length;
+      animateStat(toolsStatEl, repos.length);
 
       // Sort by most recently pushed, take 3
       const top3 = repos
