@@ -40,7 +40,7 @@
 
   <nav class="nav" id="nav">
     <div class="nav-inner">
-      <a href="index.html" class="nav-logo"><img src="assets/img/nav-icon.png" alt="" class="nav-logo-icon"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
+      <a href="index.html" class="nav-logo"><span class="logo-bracket">[</span><span class="logo-text">pelirufus<span class="accent">.</span>sh</span><span class="logo-bracket">]</span></a>
       <ul class="nav-links" id="nav-links">
         <li><a href="index.html" class="nav-link active">~/home</a></li>
         <li><a href="articles.html" class="nav-link">~/articles</a></li>
@@ -211,7 +211,7 @@
   </section>
 
   <footer class="footer">
-    <div class="container"><div class="footer-inner"><span class="footer-logo"><img src="assets/img/nav-icon.png" alt="" class="footer-logo-icon">[pelirufus.sh]</span><span class="footer-copy">Built with coffee and curiosity</span><span class="footer-tag">// stay curious. stay dangerous.</span></div></div>
+    <div class="container"><div class="footer-inner"><span class="footer-logo">[pelirufus.sh]</span><span class="footer-copy">Built with coffee and curiosity</span><span class="footer-tag">// stay curious. stay dangerous.</span></div></div>
   </footer>
 
   <script src="assets/js/main.js"></script>
@@ -333,13 +333,21 @@
       animateStat(toolsStatEl, repos.length);
 
       // Sort by most recently pushed, take 3
-      const top3 = repos
-        .sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at))
-        .slice(0, 3);
+      const sorted = repos.slice().sort((a, b) => new Date(b.pushed_at) - new Date(a.pushed_at));
+      const top3 = sorted.slice(0, 3);
+
+      // Feed the hero terminal's `ls ./arsenal/` line with the real repo list
+      // (main.js reads window.ARSENAL_LS lazily, so this can resolve after the typewriter has started)
+      const SHOWN = 6;
+      const names = sorted.map(r => r.name + '/');
+      window.ARSENAL_LS = names.length
+        ? [names.slice(0, SHOWN).join('  ') + (names.length > SHOWN ? `  ...and ${names.length - SHOWN} more` : '')]
+        : ['// no tools published yet'];
 
       renderArsenal(top3, grid);
     } catch {
       // Static fallback if GitHub API fails or rate-limited
+      window.ARSENAL_LS = ['triagekit/  sigmaforge/  loglens/  ...and more'];
       grid.innerHTML = `
         <div class="tool-card">
           <div class="tool-icon">&#128295;</div>

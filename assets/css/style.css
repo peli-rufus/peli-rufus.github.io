@@ -63,8 +63,6 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700;
   color: var(--text-bright); display: flex; align-items: center; gap: 8px; transition: color 0.2s;
 }
-.nav-logo-icon { height: 30px; width: auto; display: block; flex-shrink: 0; }
-.footer-logo-icon { height: 22px; width: auto; display: inline-block; vertical-align: -6px; margin-right: 6px; }
 .nav-logo:hover { color: var(--accent); }
 .logo-bracket { color: var(--accent); }
 .logo-text .accent { color: var(--accent2); }
@@ -182,7 +180,7 @@ a { color: inherit; text-decoration: none; }
 /* STATS */
 .hero-stats {
   max-width: 1200px; margin: 4rem auto 0;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 3rem; padding: 2rem;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   animation: stats-in 1s 0.6s ease both;
@@ -411,6 +409,7 @@ a { color: inherit; text-decoration: none; }
 /* RESPONSIVE */
 @media (max-width: 900px) {
   .hero-content { grid-template-columns: 1fr; gap: 2.5rem; }
+  .hero-stats { gap: 1.5rem; padding: 1.5rem; }
   .about-grid { grid-template-columns: 1fr; }
   .skills-grid { grid-template-columns: 1fr 1fr; }
   .certs-grid { grid-template-columns: repeat(3, 1fr); }
@@ -436,7 +435,6 @@ a { color: inherit; text-decoration: none; }
   .container { padding: 0 1.25rem; }
   .nav-inner { padding: 0 1.25rem; }
   .nav-logo { font-size: 0.95rem; gap: 6px; }
-  .nav-logo-icon { height: 26px; }
   .section { padding: 4rem 1.25rem; }
   .hero { padding: calc(var(--nav-h) + 2.5rem) 1.25rem 1.5rem; }
   .hero-name { font-size: clamp(2rem, 9vw, 2.5rem); }
@@ -453,5 +451,4 @@ a { color: inherit; text-decoration: none; }
   .btn { padding: 0.7rem 1.4rem; font-size: 0.8rem; }
   .hero-cta { gap: 0.75rem; }
   .footer { padding: 1.5rem 1.25rem; }
-  .footer-logo-icon { height: 18px; vertical-align: -4px; }
 }

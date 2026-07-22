@@ -19,10 +19,12 @@ if (hamburger && navLinks) {
 const typewriterEl = document.getElementById('typewriter');
 const termOutput = document.getElementById('term-output');
 if (typewriterEl && termOutput) {
+  // ls ./arsenal/ output is resolved lazily (via a function) so it can reflect
+  // the live GitHub repo list fetched by the Arsenal section, once that fetch resolves.
   const lines = [
     { cmd: 'whoami', output: ['dfir_engineer', '// Digital Forensics & Incident Response'] },
     { cmd: 'cat skills.txt', output: ['Memory Forensics | Threat Hunting', 'Malware Analysis | Log Analysis | Tool Dev'] },
-    { cmd: 'ls ./arsenal/', output: ['triagekit/  sigmaforge/  loglens/  ...and more'] },
+    { cmd: 'ls ./arsenal/', output: () => window.ARSENAL_LS || ['// loading tools...'] },
     { cmd: 'echo $STATUS', output: ['> Ready to investigate. Let\'s get to work.'] },
   ];
 
@@ -41,8 +43,9 @@ if (typewriterEl && termOutput) {
       setTimeout(typeNextLine, 60);
     } else if (!isDeleting && charIdx > full.length) {
       isDeleting = false;
-      // Show output
-      line.output.forEach((out, i) => {
+      // Show output (may be a static array or a function resolved at render time)
+      const outLines = typeof line.output === 'function' ? line.output() : line.output;
+      outLines.forEach((out, i) => {
         setTimeout(() => {
           const p = document.createElement('p');
           p.className = i === 0 ? 'term-green' : 'term-dim';
