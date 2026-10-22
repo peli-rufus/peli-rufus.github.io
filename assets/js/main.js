@@ -42,13 +42,12 @@ if (hamburger && navLinks) {
 const typewriterEl = document.getElementById('typewriter');
 const termOutput = document.getElementById('term-output');
 if (typewriterEl && termOutput) {
-  // ls ./arsenal/ output is resolved lazily (via a function) so it can reflect
-  // the live GitHub repo list fetched by the Arsenal section, once that fetch resolves.
+  // Keep terminal tool names aligned with the curated public tools on the homepage.
   const lines = [
     { cmd: 'whoami', output: ['dfir_engineer', '// Digital Forensics & Incident Response'] },
     { cmd: 'cat skills.txt', output: ['Memory Forensics | Threat Hunting', 'Malware Analysis | Log Analysis | Tool Dev'] },
-    { cmd: 'ls ./arsenal/', output: () => window.ARSENAL_LS || ['// loading tools...'] },
-    { cmd: 'echo $STATUS', output: ['> Ready to investigate. Let\'s get to work.'] },
+    { cmd: 'ls ./arsenal/', output: ['IconCacheReader/  dfir-artefact-parser/  esxi2csv/'] },
+    { cmd: 'echo $STATUS', output: ['> Open to full-time and contract DFIR opportunities.'] },
   ];
 
   let lineIdx = 0;
@@ -93,7 +92,12 @@ if (typewriterEl && termOutput) {
 function animateCounters() {
   const counters = document.querySelectorAll('.stat-num');
   counters.forEach(el => {
-    const target = parseInt(el.dataset.target);
+    const target = Number(el.dataset.target);
+    if (!Number.isFinite(target) || target < 0) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = target;
+      return;
+    }
     const duration = 1500;
     const start = performance.now();
     function update(now) {
@@ -109,6 +113,7 @@ function animateCounters() {
 
 // SCROLL REVEAL
 // Add reveal class FIRST, then observe (order matters!)
+if ('IntersectionObserver' in window) {
 document.querySelectorAll('.section-header, .post-card, .tool-card, .cert-card, .blog-list-item, .tool-full-card, .timeline-item, .skill-group').forEach(el => {
   el.classList.add('reveal');
 });
@@ -122,10 +127,11 @@ const revealObserver = new IntersectionObserver((entries) => {
   });
 }, { threshold: 0.1 });
 revealEls.forEach(el => revealObserver.observe(el));
+}
 
 // COUNTER OBSERVER
 const statsEl = document.querySelector('.hero-stats');
-if (statsEl) {
+if (statsEl && 'IntersectionObserver' in window) {
   const statsObserver = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting) {
       animateCounters();
