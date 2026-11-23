@@ -28,6 +28,7 @@ SHA256:5b7749150512cfe264aa3538dcbbda26a2e186bffed1cf638ddce050729f69ab
 
 Before we begin, search for the sample’s SHA-256 hash on VirusTotal. A hash lookup is a quick way to see whether the file has already been reported and review any detection names or other details that can guide our analysis. For a sample from a public repository like MalwareBazaar, this is a useful first step. We can search using the hash alone, since there’s no need to upload the file. Please treat any results as leads to verify during analysis.
 
+![VirusTotal hash lookup](../assets/img/articles/cyberchef-01/01.png)
 
 
 To begin let us open the PowerShell sample in a text editor and search for `FromBase64String`. The long line it finds in the text editor is our starting point. By the end of the walkthrough, we’ll answer three questions.
@@ -44,6 +45,7 @@ We’ll use a text editor to read the script and an offline/online copy of **Cyb
 
 Look at the `FromBase64String('…')` call in the script. The long characters between the single quotes is Base64. Base64 represents bytes as printable characters, which lets the script carry binary data inside a line of text. Just below that line, the script loops through the resulting bytes and applies `-bxor 35`. Those two lines give us the order for our CyberChef recipe.
 
+![Encoded PowerShell in the text editor](../assets/img/articles/cyberchef-01/02.png)
 
 
 Let’s start by copying the entire PowerShell script into CyberChef’s **Input** pane. Search for **Regular expression** in the operations list and drag it into the empty **Recipe** pane.
@@ -61,6 +63,7 @@ Now look at the **Output** pane. You should see a single Base64 string starting 
 
 If you still see the entire script, switch **Output format** from **Highlight matches** to **List matches**. 
 
+![CyberChef regular expression output](../assets/img/articles/cyberchef-01/03.png)
 
 
 
@@ -70,6 +73,7 @@ Now that we’ve pulled out the Base64 string, let’s turn it back into bytes. 
 
 You’ll get **798 bytes**. If the output looks garbled, that’s expected. We’ve removed the Base64 layer, and the bytes are still masked by the script’s XOR operation. We’ll undo that next.
 
+![Base64 decoding](../assets/img/articles/cyberchef-01/04.png)
 
 
 ### Reversing the XOR operation
@@ -82,6 +86,7 @@ Most of the output looks garbled because CyberChef is displaying machine code as
 
 We can spot these clues in the raw output. Next, we’ll use **Strings** to make them easier to read.
 
+![XOR-decoded output](../assets/img/articles/cyberchef-01/05.png)
 
 
 ### Finding readable strings
@@ -92,6 +97,7 @@ You’ll also see short fragments that don’t mean much on their own. **Strings
 
 Set the minimum length to **4**, then look at **Output**. You should see `/wi1K`, a `User-Agent` header, and `35[.]79[.]226[.]190` among the other fragments. A higher minimum can hide short clues like `/wi1K`, which is only five characters long.
 
+![Strings in the recovered bytes](../assets/img/articles/cyberchef-01/06.png)
 
 
 ### Viewing the decoded bytes in hex
@@ -104,12 +110,14 @@ fc e8 89 00 00 00 60 89 e5 31 d2 64 8b 52 30
 
 If your output starts with a different byte, check that **From Base64** comes before **XOR**. To see the readable fragments again, disable **To Hex** and re-enable **Strings**.
 
+![Hex view of the decoded bytes](../assets/img/articles/cyberchef-01/07.png)
 
 
 **What do the first bytes tell us?** Look at `FC E8 89 00 00 00` in CyberChef’s output. These bytes are the start of the decoded code. In 32-bit x86, `FC` tells the processor to read forward when it works through a string of bytes. The next instruction, `E8 89 00 00 00`, calls a routine farther down in the code, at offset `0x8F`.
 
 You may see `FC E8 89` in detection rules for Cobalt Strike. Those three bytes give us a clue to follow. When we look farther into this sample, we find code designed to download another payload. That makes it a **stager**. We’d need more evidence to confirm that it’s Cobalt Strike.
 
+![Inspection of the opening bytes](../assets/img/articles/cyberchef-01/08.png)
 
 
 ### Looking for the request in the recovered bytes
@@ -126,6 +134,7 @@ If you can see the IP address but can’t find `/wi1K`, check the minimum length
 
 The port takes a different kind of inspection. The code stores it as a number, so **Strings** won’t show it as the four characters `8080`. To find it, we look at the instructions that prepare the connection and read the number they pass as the port. That value is `0x1F90` in hexadecimal, which is **8080** in decimal.
 
+![Request indicators in the recovered bytes](../assets/img/articles/cyberchef-01/09.png)
 
 
 
@@ -145,6 +154,7 @@ In the screenshot, we’re using `23` in **HEX** for the XOR key. If we used `35
 9d49bf432a4872450b5e98d63102b0f7515467597375e3cfabc79efc8f1caeb5
 ```
 
+![SHA-256 of the recovered bytes](../assets/img/articles/cyberchef-01/10.png)
 
 
 1. **How does the script hide the bytes it is designed to run?** It stores XOR-masked bytes as Base64 text. When the script decodes that text, it applies XOR with decimal `35` to recover the bytes.

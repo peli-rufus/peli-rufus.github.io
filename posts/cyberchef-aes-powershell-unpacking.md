@@ -42,6 +42,7 @@ Let’s paste the entire original script into CyberChef’s **Input** pane. Sear
 
 The pattern finds the text assigned to `$encryptedPayload` between the PowerShell here-string markers `@'` and `'@`. The `[\s\S]*?` part lets us capture text across multiple lines. **List matches** gives us just the captured Base64, beginning with `A8wz7MUOrEvKTN7`.
 
+![Extracting the first layer](../assets/img/articles/cyberchef-02/01.png)
 
 
 ### Turning Base64 into encrypted bytes
@@ -52,12 +53,14 @@ In the screenshot below, the extracted Base64 has been copied into **Input** in 
 
 The output looks garbled because these are encrypted bytes. Let’s go back to the script to find out how to decrypt them.
 
+![Turning Base64 into encrypted bytes](../assets/img/articles/cyberchef-02/02.png)
 
 
 ### Following the payload variable
 
 In our text editor, look at the large block assigned to `$encryptedPayload`. The `@'` and `'@` markers let PowerShell hold text across multiple lines. The variable name points us toward encryption, but we’ll follow how the code uses it to choose our next operation.
 
+![Following the payload variable](../assets/img/articles/cyberchef-02/03.png)
 
 
 ### Finding the key, IV, and expected fingerprint
@@ -68,6 +71,7 @@ The function `ConvertFrom-EncodedBlob` strips whitespace, normalizes the Base64 
 
 The AES function also sets **CBC** mode and **PKCS7** padding. Those settings come directly from the code. The fingerprint is the expected SHA-256 of the encrypted bytes. Let’s check that first.
 
+![Finding the key, IV, and expected fingerprint](../assets/img/articles/cyberchef-02/04.png)
 
 
 ### Calculating the ciphertext fingerprint
@@ -82,6 +86,7 @@ We’re hashing the encrypted bytes at this point. Our output should be:
 
 Next, we’ll decode the expected fingerprint from the script and compare the two.
 
+![Calculating the ciphertext fingerprint](../assets/img/articles/cyberchef-02/05.png)
 
 
 ### Decoding the expected fingerprint
@@ -96,6 +101,7 @@ Add **From Base64 → To Hex**. Base64 decoding gives us hash bytes. **To Hex** 
 
 The values should match. The script performs this same comparison and stops if the ciphertext differs. This checks consistency with the fingerprint stored in the script. Someone changing the script could replace both values, so a match alone doesn’t establish trust.
 
+![Decoding the expected fingerprint](../assets/img/articles/cyberchef-02/06.png)
 
 
 ### Recovering the AES key
@@ -116,6 +122,7 @@ c3ab9dc21e13db95390e81a33357d12478575a60c348a196ad09466cd14a9e58
 
 When we paste this into **AES Decrypt** and choose **HEX**, CyberChef converts the text back into those same key bytes. The key is 32 bytes × 8 bits, which gives us **AES-256**.
 
+![Recovering the AES key](../assets/img/articles/cyberchef-02/07.png)
 
 
 ### Recovering the initialization vector
@@ -134,6 +141,7 @@ Apply **From Base64 → To Hex**, with **Delimiter** set to **None**. We should 
 
 This is **16 bytes**, displayed as 32 hex characters. AES-CBC uses the IV as the starting value when processing the first block. We’ll select **HEX** beside the IV field when we paste it into **AES Decrypt**.
 
+![Recovering the initialization vector](../assets/img/articles/cyberchef-02/08.png)
 
 
 ### Decrypting the AES layer
@@ -154,6 +162,7 @@ a32eacdfc1009db649da7bd7a403804426e33ee59bdcb74424a66cc84a769980
 
 Disable SHA2 again before copying the decrypted PowerShell into a text editor and a new CyberChef tab.
 
+![Decrypting the AES layer](../assets/img/articles/cyberchef-02/09.png)
 
 
 ### Reading the next decoding sequence
@@ -166,6 +175,7 @@ Inside that function, the code first Base64-decodes the data, then XORs it with 
 
 We can also see `$extraData` below it. That’s a separate byte array we’ll return to after recovering the first file.
 
+![Reading the next decoding sequence](../assets/img/articles/cyberchef-02/10.png)
 
 
 ### Extracting and decoding the inner blob
@@ -178,6 +188,7 @@ With the decrypted PowerShell in our new tab’s **Input**, add **Regular expres
 
 We should extract** characters**, starting with `Bx0QFSA7`. Add **From Base64** below the regex. The output is now **83,288 bytes**. It still looks garbled because we haven’t reversed XOR yet.
 
+![Extracting and decoding the inner blob](../assets/img/articles/cyberchef-02/11.png)
 
 
 ### Getting the XOR key from the script
@@ -192,6 +203,7 @@ The decoding function uses `UTF8.GetBytes($MaskKey)` to turn that text into key 
 
 That gives us both the key and its format. We’ll enter it as **UTF8** in CyberChef and copy the capitalization and punctuation exactly.
 
+![Getting the XOR key from the script](../assets/img/articles/cyberchef-02/12.png)
 
 
 ### Reversing the repeating XOR
@@ -206,6 +218,7 @@ Keep **Standard** selected and **Null preserving** unchecked. The screenshot sho
 
 Our output should become readable Base64, starting with `TVqQAAMAAAAEAAAA`. It is still **83,288 bytes** long because XOR changes each byte without changing the count. CyberChef may suggest **From Base64**. We can confirm that next step from the script’s `FromBase64String($unwrapped)` call.
 
+![Reversing the repeating XOR](../assets/img/articles/cyberchef-02/13.png)
 
 
 ### Recovering the first Windows executable
@@ -216,6 +229,7 @@ In the output, look for `MZ`, `This program cannot be run in DOS mode`, and sect
 
 The DOS message is embedded text in the file. We’re seeing it while displaying the bytes. It doesn’t indicate that the file was run.
 
+![Recovering the first Windows executable](../assets/img/articles/cyberchef-02/14.png)
 
 
 ### Verifying the first recovered file
@@ -228,6 +242,7 @@ Add **SHA2** directly after the final **From Base64**, with **Size 256** and **R
 
 A match confirms we recovered the same 62,464-byte file. To save its raw bytes, disable SHA2 and use **Save output to file**. We can call it `recovered-assembly.bin`.
 
+![Verifying the first recovered file](../assets/img/articles/cyberchef-02/15.png)
 
 
 ### Extracting the second embedded file
@@ -242,6 +257,7 @@ Paste the decrypted script into another CyberChef tab. Add **Regular expression*
 
 This gives us the numbers inside the parentheses, ready to convert. The surrounding code groups `$extraData` and the `aspnet_compiler.exe` path into arguments for the first assembly’s `LAUNCHER` method.
 
+![Extracting the second embedded file](../assets/img/articles/cyberchef-02/16.png)
 
 
 ### Converting decimal numbers into bytes
@@ -252,6 +268,7 @@ Decimal `77` becomes byte `4D`, and decimal `90` becomes byte `5A`. Together the
 
 This recovers the executable represented by the array. The PowerShell passes these bytes directly to the first assembly.
 
+![Converting decimal numbers into bytes](../assets/img/articles/cyberchef-02/17.png)
 
 
 ### Verifying the second file and checking our findings
@@ -264,6 +281,7 @@ Add **SHA2** directly after **From Decimal**, set **Size** to **256**, and leave
 
 This hash identifies the second recovered file. Disable SHA2 before saving the raw output as `recovered-extra-data.bin`.
 
+![Verifying the second file and checking our findings](../assets/img/articles/cyberchef-02/18.png)
 
 
 ### What have we established?
