@@ -8,8 +8,8 @@ views: 0
 private: false
 excerpt: "A practical DFIR guide to IconCache.db featuring IconCacheReader — real evidence of VMware shared-folder activity, USB drive browsing, and how to avoid overclaiming execution from path text alone."
 related:
-  - blackbasta-memory-forensics
-  - evtx-tampering-recovery
+  - cyberchef-powershell-base64-xor
+  - cyberchef-aes-powershell-unpacking
 ---
 
 ## Why This Artifact Still Matters
