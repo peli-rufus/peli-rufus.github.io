@@ -338,6 +338,26 @@
   const nl = document.getElementById('nav-links');
   if (hb) hb.addEventListener('click', () => nl.classList.toggle('open'));
 
+  const themeToggle = document.getElementById('theme-toggle');
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  }
+  function paintToggleIcon() {
+    if (!themeToggle) return;
+    themeToggle.textContent = currentTheme() === 'light' ? '☀' : '☾';
+    themeToggle.setAttribute('aria-label', currentTheme() === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+  }
+  if (themeToggle) {
+    paintToggleIcon();
+    themeToggle.addEventListener('click', () => {
+      const next = currentTheme() === 'light' ? 'dark' : 'light';
+      if (next === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      else document.documentElement.removeAttribute('data-theme');
+      try { localStorage.setItem('theme', next); } catch {}
+      paintToggleIcon();
+    });
+  }
+
   init();
   </script>
 </body>
