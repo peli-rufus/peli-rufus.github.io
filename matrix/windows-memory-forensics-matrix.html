@@ -235,6 +235,16 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
     <div class="filter-btns" id="cat-filters"></div>
   </div>
   <div class="matrix-controls" style="font-size:11px;line-height:1.6;color:var(--text2)">Reference validated against the <a href="https://volatility3.readthedocs.io/en/latest/volatility3.plugins.windows.html" target="_blank" rel="noopener" style="color:var(--accent)">Official Volatility 3 plugin reference</a> and <a href="https://github.com/volatilityfoundation/volatility3/blob/develop/doc/source/vol-cli.rst" target="_blank" rel="noopener" style="color:var(--accent)">CLI documentation</a>. Plugin support varies by installed version; always check <code>vol.py --help</code> and plugin-specific <code>--help</code>. Findings are leads, not standalone proof of compromise.</div>
+  <div class="matrix-controls" style="font-size:11px;line-height:1.7;color:var(--text2)">
+    <strong style="color:var(--text)">Command placeholders:</strong>&nbsp;
+    Values in angle brackets are <strong>examples to replace</strong>, not text to type literally.
+    <code class="mono-inline">&lt;PID&gt;</code> = process ID;
+    <code class="mono-inline">&lt;DNS_CLIENT_PID&gt;</code> = PID hosting Dnscache;
+    <code class="mono-inline">&lt;VIRTUAL_ADDRESS&gt;</code> = memory address;
+    <code class="mono-inline">&lt;RULE_FILE&gt;</code> = YARA file path;
+    <code class="mono-inline">&lt;OUTPUT_DIR&gt;</code> = extraction directory.
+    Identify the correct value from an earlier command before running the next one.
+  </div>
   <div class="legend">
     <span>Forensic value:</span>
     <span class="legend-item"><span class="dot" style="background:#1D9E75"></span>Excellent</span>
@@ -855,8 +865,8 @@ const DATA = [
    iocs:["Recently closed C2 connections still in pool","UDP listeners in unexpected processes","Connections missing from netstat (partial rootkit hiding)","Short-lived exfil burst connections"],
    src:"Firewall/proxy logs (for historical)"},
   {art:"DNS cache fragments",desc:"Potential DNS-related strings in DNS Client service memory; not a reliable complete DNS cache",cat:"Network",quality:"Partial",
-   cmds:["vol.py -f memory.dmp windows.pslist | grep -i svchost","vol.py -f memory.dmp windows.memmap --dump --pid <DNS_svchost_PID>","# strings pid.dmp | grep -iE '[a-z0-9-]+\\.[a-z]{2,6}' | sort -u > domains.txt"],
-   iocs:["DGA-pattern domain names","Recently resolved C2 infrastructure","High-entropy subdomain strings (beaconing)"],
+   cmds:["# 1. Identify the PID hosting the Dnscache service (not every svchost.exe hosts it)","vol.py -f memory.dmp windows.svclist.SvcList","# 2. Replace <DNS_CLIENT_PID> with the PID identified above","vol.py -o ./dns_pages/ -f memory.dmp windows.memmap.Memmap --pid <DNS_CLIENT_PID> --dump","# 3. Inspect extracted pages for candidate strings; filenames vary","strings -el ./dns_pages/* | grep -Ei '[a-z0-9-]+\\.[a-z]{2,}' | sort -u > domains.txt"],
+   iocs:["DGA-pattern domain names (needs validation)","Possible DNS-related C2 domains — corroborate with DNS logs","High-entropy subdomain strings — not proof of beaconing"],
    src:"ipconfig /displaydns (live), DNS server logs"},
   // ── REGISTRY ──
   {art:"Registry hive list",desc:"All registry hives currently mapped in memory",cat:"Registry",quality:"Excellent",
@@ -902,11 +912,11 @@ const DATA = [
    iocs:["Service account passwords in LSA secrets","$DCC2 hashes for offline cracking","Auto-logon credentials stored in LSA","DPAPI machine keys in LSA secrets"],
    src:"SECURITY hive (encrypted on disk — requires SYSTEM key)"},
   {art:"Kerberos tickets (LSASS dump)",desc:"Potentially recoverable Kerberos ticket artifacts; requires compatible acquisition and parser",cat:"Credentials",quality:"Excellent",
-   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep lsass","vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
+   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep lsass","vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <LSASS_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
    iocs:["Unusually long TGT lifetime can warrant investigation; not proof of a Golden Ticket, non-standard encryption","Silver ticket — service ticket with no TGT","Tickets for accounts not currently logged on","Forged PAC data"],
    src:"None — memory only (tickets expire and cannot be reconstructed)"},
   {art:"Plaintext credentials (LSASS)",desc:"Potential credential material in LSASS memory; availability depends on configuration and sessions",cat:"Credentials",quality:"Excellent",
-   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
+   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <LSASS_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
    iocs:["Domain admin credentials in LSASS memory","Service account passwords","WDigest enabled (UseLogonCredential=1) = guaranteed cleartext"],
    src:"None — memory only"},
   {art:"Process SIDs",desc:"SIDs associated with each process — spot privilege escalation",cat:"Credentials",quality:"Good",
@@ -914,11 +924,11 @@ const DATA = [
    iocs:["Non-admin process carrying SYSTEM SID (S-1-5-18)","Unexpected high-privilege SIDs in user processes","Service SIDs in interactive session processes"],
    src:"None — memory only"},
   {art:"DPAPI master keys",desc:"Potential DPAPI-related secret material in memory; reconstruction requires appropriate tools and context",cat:"Credentials",quality:"Good",
-   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# strings on dump | grep -i dpapi"],
+   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <LSASS_PID>","# strings on dump | grep -i dpapi"],
    iocs:["Keys enabling browser credential decryption offline","Keys for RDP saved credential blobs","DPAPI blob exfiltration to decrypt offline"],
    src:"AppData\\Roaming\\Microsoft\\Protect (disk — encrypted)"},
   {art:"Browser credentials in memory",desc:"Possible decrypted browser credential fragments in process memory; not guaranteed",cat:"Credentials",quality:"Partial",
-   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID>","# strings pid.dmp | grep -iE 'password|passwd|login'"],
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <BROWSER_PID>","# strings pid.dmp | grep -iE 'password|passwd|login'"],
    iocs:["Corporate SSO credentials in plaintext","Email and cloud service passwords","VPN and remote access credentials"],
    src:"Browser SQLite Login Data (DPAPI-encrypted on disk)"},
   {art:"Skeleton Key detection",desc:"Detects Skeleton Key malware patching LSASS authentication",cat:"Credentials",quality:"Good",
@@ -939,11 +949,11 @@ const DATA = [
    iocs:["Unexpected interactive sessions","Service accounts with interactive logon type","Multiple simultaneous sessions suggesting hijacking"],
    src:"Event ID 4624/4634, qwinsta (live)"},
   {art:"PowerShell history in memory",desc:"Potential PowerShell command strings/history in process memory; completeness is not guaranteed",cat:"User Activity",quality:"Good",
-   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <powershell_PID>","# strings pid.dmp | grep -iE 'invoke|iex|bypass|encoded|downloadstring'"],
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <POWERSHELL_PID>","# strings pid.dmp | grep -iE 'invoke|iex|bypass|encoded|downloadstring'"],
    iocs:["Encoded commands (-enc, -EncodedCommand)","Download cradles (IEX, DownloadString, WebClient)","AMSI bypass attempts","Reflective loading patterns"],
    src:"PSReadLine ConsoleHost_history.txt, Event ID 4104"},
   {art:"Browser session artifacts",desc:"Potential browser session fragments and secrets in memory; content may be incomplete",cat:"Browser",quality:"Good",
-   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID>","# strings pid.dmp | grep -iE 'https?://|session|cookie|bearer|password'"],
+   cmds:["vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <BROWSER_PID>","# strings pid.dmp | grep -iE 'https?://|session|cookie|bearer|password'"],
    iocs:["C2 infrastructure URLs","Session tokens enabling account takeover","OAuth bearer tokens","Incognito activity — no disk trace for these"],
    src:"Browser SQLite history/cookies (disk — encrypted, no incognito)"},
   // ── KERNEL ──
@@ -973,7 +983,7 @@ const DATA = [
    iocs:["Suspicious paths open in legitimate processes","Staging directories with files open","Log files opened by non-logging process (log tampering)"],
    src:"MFT, filesystem timestamps"},
   {art:"Memory-cached files (dumpfiles)",desc:"Attempts recovery of cached file-backed pages; output may be partial or unavailable",cat:"File System",quality:"Partial",
-   cmds:["vol.py -o ./cached_files/ -f memory.dmp windows.dumpfiles.DumpFiles","vol.py -o ./out/ -f memory.dmp windows.dumpfiles.DumpFiles --virtaddr <addr>"],
+   cmds:["vol.py -o ./cached_files/ -f memory.dmp windows.dumpfiles.DumpFiles","vol.py -o ./out/ -f memory.dmp windows.dumpfiles.DumpFiles --virtaddr <VIRTUAL_ADDRESS>"],
    iocs:["Deleted malware still in page cache after execution","Exfiltrated documents still in memory","Malware config files cached from disk"],
    src:"Disk (if not deleted — memory cache may have deleted versions)"},
   {art:"MFT entries (mftscan)",desc:"MFT FILE records, ADS, and resident data in memory",cat:"File System",quality:"Partial",
@@ -998,7 +1008,7 @@ const DATA = [
    iocs:["Hardcoded C2 IPs and domain names","Mutex name strings (family fingerprints)","File path staging locations","Registry key strings used for persistence"],
    src:"Disk artifacts, EDR telemetry — memory catches fileless variants"},
   {art:"Certutil download cache",desc:"LOLBin download evidence — cmdline + memory buffers",cat:"Threat Intel",quality:"Partial",
-   cmds:["vol.py -f memory.dmp windows.cmdline.CmdLine | grep -i certutil","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <certutil_PID>","# strings pid.dmp | grep -iE 'http|urlcache|-split|-f'"],
+   cmds:["vol.py -f memory.dmp windows.cmdline.CmdLine | grep -i certutil","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <CERTUTIL_PID>","# strings pid.dmp | grep -iE 'http|urlcache|-split|-f'"],
    iocs:["Download URL in certutil command line","certutil -urlcache -split -f pattern","Downloaded payload content in process memory buffers"],
    src:"CryptnetUrlCache on disk (Content + MetaData directories)"},
 
@@ -1006,13 +1016,13 @@ const DATA = [
   {art:"Kerberos tickets (in-memory)",desc:"Potential ticket-cache evidence in memory; ticket forgery requires independent validation",cat:"Credentials",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.registry.lsadump.Lsadump",
          "# Dump LSASS for offline mimikatz Kerberos extraction",
-         "vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> -o ./lsass_dump/",
+         "vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <LSASS_PID> -o ./lsass_dump/",
          "# mimikatz offline: sekurlsa::tickets /export"],
    iocs:["Ticket lifetime 10 years = Golden Ticket (full domain compromise)","Service ticket with no matching TGT = Silver Ticket","TGT for non-existent account","Ticket issued outside business hours or from unexpected host"],
    src:"Event ID 4768/4769 (Kerberos), DC security logs"},
   {art:"Browser saved passwords (memory)",desc:"Potential decrypted browser secrets in process memory; encryption, process and version dependent",cat:"Credentials",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep -iE 'chrome|msedge|firefox'",
-         "vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <browser_PID> -o ./browser_dump/",
+         "vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <BROWSER_PID> -o ./browser_dump/",
          "# strings -el browser_dump/*.dmp | grep -iE 'password|passwd|credential|bearer|token'"],
    iocs:["Cleartext credentials in browser heap — decrypted at runtime","OAuth bearer tokens","Session cookies enabling account takeover without credentials","Credentials for cloud services or internal apps"],
    src:"Browser Login Data SQLite (DPAPI-encrypted on disk — memory has decrypted version)"},
@@ -1067,7 +1077,7 @@ const DATA = [
    iocs:["Process escaping from sandboxed Job Object","Malware adding itself to a Job to survive parent termination","Job object with unusual limits or permissions"],
    src:"None — memory only"},
   {art:"PE dump (pedump)",desc:"Dump PE file from a specific in-memory address — precise extraction for analysis",cat:"Threat Intel",quality:"Good",
-   cmds:["vol.py -f memory.dmp windows.pedump.PEDump --pid <PID> --base <base_addr> -o ./pe_out/",
+   cmds:["vol.py -f memory.dmp windows.pedump.PEDump --pid <PID> --base <BASE_ADDRESS> -o ./pe_out/",
          "# Get base address from dlllist or vadinfo output first",
          "vol.py -f memory.dmp windows.dlllist.DllList --pid <PID>"],
    iocs:["Precise extraction of injected PE at known base address","More accurate than malfind dumps for PE reconstruction","Use when malfind dump is incomplete or truncated"],
@@ -1095,7 +1105,7 @@ const DATA = [
    cmds:["vol.py -f memory.dmp regexscan.RegExScan --pattern '[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}'",
          "vol.py -f memory.dmp windows.vadregexscan.VadRegExScan --pid <PID> --pattern 'https?://[^ ]+'",
          "# Hunt for encoded PowerShell",
-         "vol.py -f memory.dmp windows.vadregexscan.VadRegExScan --pid <PS_PID> --pattern '[A-Za-z0-9+/]{50,}={0,2}'"],
+         "vol.py -f memory.dmp windows.vadregexscan.VadRegExScan --pid <POWERSHELL_PID> --pattern '[A-Za-z0-9+/]{50,}={0,2}'"],
    iocs:["C2 IP addresses hardcoded in process memory","Encoded payloads (base64 blocks) in PowerShell heap","DGA domain patterns — high-entropy hostname strings","Registry key strings used for persistence"],
    src:"strings + grep (less precise — no PID attribution)"},
 ];
@@ -1180,7 +1190,7 @@ function buildTable(){
     const iocHtml = d.iocs.map(i =>
       `<div class="ioc-item"><span class="ioc-dot" style="background:${q.color}"></span><span>${i}</span></div>`
     ).join("");
-    const cmdsHtml = d.cmds.map(c => `<span class="vol-cmd">${c}</span>`).join("");
+    const cmdsHtml = d.cmds.map(c => `<span class="vol-cmd">${c.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`).join("");
     const searchText = [d.art, d.desc, d.cat, ...d.cmds, ...d.iocs, d.quality, d.src].join(" ").toLowerCase();
     const cc = catColor(d.cat);
     return `<tr data-cat="${d.cat}" data-text="${searchText}"
