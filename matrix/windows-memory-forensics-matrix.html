@@ -66,6 +66,25 @@ input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rg
 .fbtn:hover { background: var(--bg3); color: var(--text); }
 .fbtn.active { font-weight: 600; background: var(--bg3); color: var(--text); border-color: var(--border2); }
 
+/* Compact, accessible help in the matrix toolbar; no full-width instructional strip. */
+.placeholder-guide { position: relative; margin-left: auto; flex-shrink: 0; z-index: 30; }
+.placeholder-guide > summary { list-style: none; display: inline-flex; gap: 7px; align-items: center; cursor: pointer; padding: 6px 10px; border: 1px solid var(--border2); border-radius: var(--radius); background: var(--bg2); color: var(--text2); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.placeholder-guide > summary::-webkit-details-marker { display: none; }
+.placeholder-guide > summary:hover, .placeholder-guide[open] > summary { color: var(--accent); border-color: var(--accent); }
+.placeholder-guide > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.guide-icon { display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--accent); color: var(--accent); font-size: 10px; }
+.guide-chevron { font-size: 10px; transition: transform .15s; }
+.placeholder-guide[open] .guide-chevron { transform: rotate(180deg); }
+.placeholder-guide-panel { position: absolute; top: calc(100% + 9px); right: 0; width: min(340px, calc(100vw - 32px)); max-height: min(65vh, 440px); overflow: auto; background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(0,0,0,.20); padding: 16px; font-size: 12px; line-height: 1.6; color: var(--text2); }
+.placeholder-guide-panel p { margin: 0 0 8px; }
+.placeholder-guide-panel p strong { color: var(--text); }
+.placeholder-guide-panel dl { margin: 12px 0 0; display: grid; gap: 9px; }
+.placeholder-guide-panel dl > div { display: grid; grid-template-columns: minmax(105px,auto) 1fr; gap: 10px; align-items: baseline; }
+.placeholder-guide-panel dt, .placeholder-guide-panel dd { margin: 0; }
+.placeholder-guide-panel dt code { color: var(--accent); background: var(--bg3); border-radius: 4px; padding: 2px 5px; font: 10px var(--mono); }
+@media (max-width: 600px) { .placeholder-guide { margin-left: 0; } .placeholder-guide-panel { right: auto; left: 0; } }
+
+
 /* LEGEND */
 .legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 0.5rem 2rem; border-bottom: 0.5px solid var(--border); font-size: 11px; color: var(--text3); align-items: center; }
 .legend-item { display: flex; align-items: center; gap: 5px; }
@@ -238,18 +257,22 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
       <input type="text" id="search" placeholder="Search artifact, command, IOC…" oninput="applyFilters()">
     </div>
     <div class="filter-btns" id="cat-filters"></div>
+    <details class="placeholder-guide">
+      <summary aria-label="Show command placeholder guide"><span class="guide-icon" aria-hidden="true">?</span> Placeholder guide <span class="guide-chevron" aria-hidden="true">▾</span></summary>
+      <div class="placeholder-guide-panel">
+        <p><strong>Command placeholders</strong></p>
+        <p>Values in angle brackets are <strong>examples to replace</strong>, not text to type literally. Identify the value from an earlier command first.</p>
+        <dl>
+          <div><dt><code>&lt;PID&gt;</code></dt><dd>Process ID</dd></div>
+          <div><dt><code>&lt;DNS_CLIENT_PID&gt;</code></dt><dd>PID hosting Dnscache</dd></div>
+          <div><dt><code>&lt;VIRTUAL_ADDRESS&gt;</code></dt><dd>Memory address</dd></div>
+          <div><dt><code>&lt;RULE_FILE&gt;</code></dt><dd>YARA rule file path</dd></div>
+          <div><dt><code>&lt;OUTPUT_DIR&gt;</code></dt><dd>Extraction directory</dd></div>
+        </dl>
+      </div>
+    </details>
   </div>
   <div class="matrix-controls" style="font-size:11px;line-height:1.6;color:var(--text2)">Reference validated against the <a href="https://volatility3.readthedocs.io/en/latest/volatility3.plugins.windows.html" target="_blank" rel="noopener" style="color:var(--accent)">Official Volatility 3 plugin reference</a> and <a href="https://github.com/volatilityfoundation/volatility3/blob/develop/doc/source/vol-cli.rst" target="_blank" rel="noopener" style="color:var(--accent)">CLI documentation</a>. Plugin support varies by installed version; always check <code>vol.py --help</code> and plugin-specific <code>--help</code>. Findings are leads, not standalone proof of compromise.</div>
-  <div class="matrix-controls" style="font-size:11px;line-height:1.7;color:var(--text2)">
-    <strong style="color:var(--text)">Command placeholders:</strong>&nbsp;
-    Values in angle brackets are <strong>examples to replace</strong>, not text to type literally.
-    <code class="mono-inline">&lt;PID&gt;</code> = process ID;
-    <code class="mono-inline">&lt;DNS_CLIENT_PID&gt;</code> = PID hosting Dnscache;
-    <code class="mono-inline">&lt;VIRTUAL_ADDRESS&gt;</code> = memory address;
-    <code class="mono-inline">&lt;RULE_FILE&gt;</code> = YARA file path;
-    <code class="mono-inline">&lt;OUTPUT_DIR&gt;</code> = extraction directory.
-    Identify the correct value from an earlier command before running the next one.
-  </div>
   <div class="legend">
     <span>Forensic value:</span>
     <span class="legend-item"><span class="dot" style="background:#1D9E75"></span>Excellent</span>
