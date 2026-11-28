@@ -511,7 +511,7 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
           <code class="cmd-line">vol.py -o ./clip_dump/ -f memory.dmp windows.memmap.Memmap --dump --pid &lt;PID&gt;</code>
           <code class="cmd-comment"># Extract clipboard strings from process dump</code>
           <code class="cmd-line">strings -el ./clip_dump/*.dmp | grep -iE ".{8,}" &gt; clipboard_strings.txt</code>
-          <code class="cmd-comment"># Console history — every command the attacker typed in cmd.exe</code>
+          <code class="cmd-comment"># Console buffers may contain a subset of commands; do not assume completeness in cmd.exe</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.consoles.Consoles</code>
           <code class="cmd-comment"># Active logon sessions</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.sessions.Sessions</code>
@@ -876,7 +876,7 @@ const DATA = [
    src:"SYSTEM hive AppCompatCache key (disk — better for full history). NOTE: shimcachemem reads from the live ahcache.sys kernel AVL tree, not the registry key — entries here may not yet be flushed to disk, making it MORE current than the on-disk artefact for recently executed binaries"},
   {art:"Amcache",desc:"Executed application metadata from AmCache hive",cat:"Registry",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.registry.amcache.Amcache"],
-   iocs:["SHA1 hashes of executed files — submit to VirusTotal","Execution of files since deleted","Timestamps of first execution"],
+   iocs:["SHA-1 references from Amcache are leads for reputation checks; Amcache entries alone do not prove execution","Historical file/application metadata, possibly for files no longer on disk; execution requires corroboration","Timestamps of first execution"],
    src:"C:\\Windows\\AppCompat\\Programs\\Amcache.hve (disk)"},
   {art:"Scheduled tasks",desc:"Decodes scheduled task info from registry in memory",cat:"Registry",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.registry.scheduled_tasks.ScheduledTasks"],
@@ -901,11 +901,11 @@ const DATA = [
    iocs:["Service account passwords in LSA secrets","$DCC2 hashes for offline cracking","Auto-logon credentials stored in LSA","DPAPI machine keys in LSA secrets"],
    src:"SECURITY hive (encrypted on disk — requires SYSTEM key)"},
   {art:"Kerberos tickets (LSASS dump)",desc:"TGTs and service tickets — irreplaceable from memory",cat:"Credentials",quality:"Excellent",
-   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep lsass","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# Offline: mimikatz \"sekurlsa::minidump lsass.dmp\" \"sekurlsa::tickets /export\" exit"],
-   iocs:["Golden ticket — 10-year validity, non-standard encryption","Silver ticket — service ticket with no TGT","Tickets for accounts not currently logged on","Forged PAC data"],
+   cmds:["vol.py -f memory.dmp windows.pslist.PsList | grep lsass","vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
+   iocs:["Unusually long TGT lifetime can warrant investigation; not proof of a Golden Ticket, non-standard encryption","Silver ticket — service ticket with no TGT","Tickets for accounts not currently logged on","Forged PAC data"],
    src:"None — memory only (tickets expire and cannot be reconstructed)"},
   {art:"Plaintext credentials (LSASS)",desc:"Cleartext passwords via WDigest, SSP, or CredMan",cat:"Credentials",quality:"Excellent",
-   cmds:["vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# Offline: mimikatz \"sekurlsa::minidump lsass.dmp\" \"sekurlsa::logonpasswords\" exit"],
+   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# Raw process-address-space output is NOT a Mimikatz-compatible Windows minidump"],
    iocs:["Domain admin credentials in LSASS memory","Service account passwords","WDigest enabled (UseLogonCredential=1) = guaranteed cleartext"],
    src:"None — memory only"},
   {art:"Process SIDs",desc:"SIDs associated with each process — spot privilege escalation",cat:"Credentials",quality:"Good",
@@ -913,7 +913,7 @@ const DATA = [
    iocs:["Non-admin process carrying SYSTEM SID (S-1-5-18)","Unexpected high-privilege SIDs in user processes","Service SIDs in interactive session processes"],
    src:"None — memory only"},
   {art:"DPAPI master keys",desc:"Data Protection API keys for decrypting stored secrets",cat:"Credentials",quality:"Good",
-   cmds:["vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <lsass_PID> --dump-dir ./lsass/","# strings on dump | grep -i dpapi"],
+   cmds:["vol.py -o ./lsass/ -f memory.dmp windows.memmap.Memmap --dump --pid <lsass_PID>","# strings on dump | grep -i dpapi"],
    iocs:["Keys enabling browser credential decryption offline","Keys for RDP saved credential blobs","DPAPI blob exfiltration to decrypt offline"],
    src:"AppData\\Roaming\\Microsoft\\Protect (disk — encrypted)"},
   {art:"Browser credentials in memory",desc:"Saved passwords decrypted in browser process heap",cat:"Credentials",quality:"Partial",
@@ -926,7 +926,7 @@ const DATA = [
    src:"None — memory only"},
   // ── USER ACTIVITY ──
   {art:"Clipboard contents",desc:"Clipboard buffer contents at exact time of capture",cat:"User Activity",quality:"Excellent",
-   cmds:["# No native clipboard plugin in Vol3 — dump the owning process","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <PID> -o ./clip_dump/","# strings -el clip_dump/*.dmp | grep -iE '.{8,}' > clipboard_strings.txt"],
+   cmds:["# No native clipboard plugin in Vol3 — dump the owning process","vol.py -o ./clip_dump/ -f memory.dmp windows.memmap.Memmap --dump --pid <PID>","# strings -el clip_dump/*.dmp | grep -iE '.{8,}' > clipboard_strings.txt"],
    iocs:["Copied credentials or API keys","Staged exfiltration data","Commands being prepared for execution","Internal IP ranges or hostnames"],
    src:"None — memory only"},
   {art:"Console history (cmd.exe)",desc:"Commands typed in cmd.exe — full console buffer",cat:"User Activity",quality:"Excellent",
@@ -972,7 +972,7 @@ const DATA = [
    iocs:["Suspicious paths open in legitimate processes","Staging directories with files open","Log files opened by non-logging process (log tampering)"],
    src:"MFT, filesystem timestamps"},
   {art:"Memory-cached files (dumpfiles)",desc:"Files cached by Windows cache manager — recoverable",cat:"File System",quality:"Partial",
-   cmds:["vol.py -o ./cached_files/ -f memory.dmp windows.dumpfiles.DumpFiles","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --virtaddr <addr> --dump-dir ./out/"],
+   cmds:["vol.py -o ./cached_files/ -f memory.dmp windows.dumpfiles.DumpFiles","vol.py -o ./out/ -f memory.dmp windows.dumpfiles.DumpFiles --virtaddr <addr>"],
    iocs:["Deleted malware still in page cache after execution","Exfiltrated documents still in memory","Malware config files cached from disk"],
    src:"Disk (if not deleted — memory cache may have deleted versions)"},
   {art:"MFT entries (mftscan)",desc:"MFT FILE records, ADS, and resident data in memory",cat:"File System",quality:"Partial",
@@ -981,7 +981,7 @@ const DATA = [
    src:"$MFT on disk (complete — memory is partial/cached only)"},
   // ── THREAT INTEL ──
   {art:"Unpacked malware samples",desc:"Packed malware decompressed in memory — cleaner than disk",cat:"Threat Intel",quality:"Excellent",
-   cmds:["vol.py -o ./unpacked/ -f memory.dmp windows.malware.malfind.Malfind --dump","vol.py -f memory.dmp windows.dumpfiles.DumpFiles --pid <PID> --dump-dir ./proc_dump/","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <PID>"],
+   cmds:["vol.py -o ./unpacked/ -f memory.dmp windows.malware.malfind.Malfind --dump","vol.py -o ./proc_dump/ -f memory.dmp windows.dumpfiles.DumpFiles --pid <PID>","vol.py -f memory.dmp windows.memmap.Memmap --dump --pid <PID>"],
    iocs:["Unpacked PE ready for YARA/sandbox/reverse engineering","C2 config strings visible in plaintext post-unpack","Import table reveals full capability profile"],
    src:"Memory only — disk sample is packed/obfuscated"},
   {art:"YARA scan",desc:"Pattern match known malware signatures across dump",cat:"Threat Intel",quality:"Excellent",
@@ -1524,7 +1524,7 @@ EOF</code>
         <code class="cmd-comment"># Run this in PowerShell as Administrator:</code>
         <code class="cmd-line">$bat = @'
 @echo off
-call C:\opt\volatility3\venv\Scriptsctivate.bat
+call C:\opt\volatility3\venv\Scripts\activate.bat
 python C:\opt\volatility3\vol.py %*
 '@
 $bat | Set-Content "C:\Windows\System32\vol.bat"</code>
@@ -1555,7 +1555,7 @@ $bat | Set-Content "C:\Windows\System32\vol.bat"</code>
         <thead><tr><th>Error / symptom</th><th>Cause</th><th>Fix</th></tr></thead>
         <tbody>
           <tr>
-            <td><code style="font-family:var(--mono);font-size:11px">No suitable address space mapping found</code></td>
+            <td><code style="font-family:var(--mono);font-size:11px">Unable to construct a valid memory translation layer</code></td>
             <td>Missing or wrong symbol table for the target OS build</td>
             <td>Download the correct Windows symbol pack and place in <code style="font-family:var(--mono);font-size:11px">volatility3/symbols/</code></td>
           </tr>
