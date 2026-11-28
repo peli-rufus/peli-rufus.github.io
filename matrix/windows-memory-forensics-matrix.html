@@ -283,11 +283,11 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
         <p>Never skip this step. Wrong OS assumptions produce garbage output from every subsequent plugin. A truncated or corrupted dump may cause missing artifacts, parsing errors or misleading output. Preserve acquisition metadata, calculate a cryptographic hash and check capture completeness separately. Confirm exactly what you are working with before interpreting any results.</p>
         <div class="cmd-block">
           <div class="cmd-block-label">Image identification</div>
-          <code class="cmd-comment"># OS version, build number, architecture, memory model</code>
+          <code class="cmd-comment"># Kernel OS metadata and architecture where recoverable; validate against acquisition context</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.info</code>
           <code class="cmd-comment"># Inspect virtual-to-physical mappings; this is NOT a dump completeness or integrity test</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap</code>
-          <code class="cmd-comment"># If auto-detection fails — list available symbol layers</code>
+          <code class="cmd-comment"># Banner scan may provide hints, but Windows kernel symbols are usually resolved using PDB information</code>
           <code class="cmd-line">vol.py -f memory.dmp banners.Banners</code>
         </div>
         <ul class="hunt-list">
@@ -489,7 +489,7 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
         <span class="phase-chevron">&#9660;</span>
       </div>
       <div class="phase-body">
-        <p>LSASS holds everything the attacker wants. Volatility can extract recoverable process address-space pages, but windows.memmap --dump does not generate a conventional Windows minidump. Do not assume Mimikatz minidump commands can directly parse this output. Handle sensitive memory only in an authorised, isolated forensic environment. Kerberos tickets are especially valuable: they are time-limited cryptographic tokens that cannot be reconstructed from disk and expire, so they must be captured from memory promptly.</p>
+        <p>LSASS holds everything the attacker wants. Volatility can extract recoverable process address-space pages, but windows.memmap --dump does not generate a conventional Windows minidump. Do not assume Mimikatz minidump commands can directly parse this output. Handle sensitive memory only in an authorised, isolated forensic environment. Kerberos ticket caches can be important volatile evidence; collection scope, disk traces, active sessions and ticket lifetime determine what may still be recovered.</p>
         <div class="cmd-block">
           <div class="cmd-block-label">Credential artifacts</div>
           <code class="cmd-comment"># Recover local SAM account hashes from registry hives where present; not arbitrary domain credentials or LSASS contents</code>
@@ -533,12 +533,12 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
         <span class="phase-chevron">&#9660;</span>
       </div>
       <div class="phase-body">
-        <p>The final phase converts memory artifacts into actionable intelligence. Dumped processes and memory regions go through static analysis, YARA rules, capability extraction (capa), and threat intel enrichment. The unpacked version of any packed malware found in memory is a significant analytical prize — it is ready for reverse engineering without fighting the packer, and often contains cleartext C2 configuration that the packed version hides.</p>
+        <p>The final phase converts recoverable memory artifacts into investigative leads and evidence requiring validation. Dumped processes and memory regions go through static analysis, YARA rules, capability extraction (capa), and threat intel enrichment. Recovered memory regions may contain unpacked malware or configuration, but reconstruction and validation are required before treating extracted bytes as a complete executable.</p>
         <div class="cmd-block">
           <div class="cmd-block-label">Artifact extraction and enrichment</div>
-          <code class="cmd-comment"># Dump all files cached in memory by the Windows cache manager</code>
+          <code class="cmd-comment"># Extract recoverable cached file content represented by FILE_OBJECTs; not all cached files are guaranteed</code>
           <code class="cmd-line">vol.py -o ./cached_files/ -f memory.dmp windows.dumpfiles.DumpFiles</code>
-          <code class="cmd-comment"># Dump full address space of a specific process</code>
+          <code class="cmd-comment"># Extract recoverable mapped process pages (not a standard Windows minidump)</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.memmap.Memmap --dump --pid &lt;PID&gt;</code>
           <code class="cmd-comment"># Dump malfind-flagged regions — unpacked malware, shellcode</code>
           <code class="cmd-line">vol.py -o ./injected/ -f memory.dmp windows.malware.malfind.Malfind --dump</code>
@@ -549,7 +549,7 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
           <code class="cmd-comment"># Kernel driver pool scan — diff with modules to find hidden drivers</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.driverscan.DriverScan</code>
           <code class="cmd-line">vol.py -f memory.dmp windows.modules.Modules</code>
-          <code class="cmd-comment"># Raw string extraction — IPs, URLs, domains, registry keys, paths</code>
+          <code class="cmd-comment"># Raw string extraction can yield candidate strings; validate offsets, process context and encoding</code>
           <code class="cmd-comment"># strings -el memory.dmp | grep -iE 'https?://|\\[A-Za-z]|HKEY' &gt; strings_out.txt</code>
           <code class="cmd-comment"># Bulk IOC extraction (emails, URLs, IPs, domains, credit cards)</code>
           <code class="cmd-comment"># bulk_extractor -o bulk_out/ memory.dmp</code>
@@ -758,19 +758,19 @@ const QUAL = {
 
 const DATA = [
   // ── PROCESS ──
-  {art:"Process list (pslist)",desc:"Official EPROCESS linked list — what Windows reports",cat:"Process",quality:"Excellent",
+  {art:"Process list (pslist)",desc:"Active EPROCESS linked-list traversal; not equivalent to Task Manager enumeration",cat:"Process",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.pslist","vol.py -f memory.dmp windows.pstree"],
    iocs:["Misspelled legit names (svch0st, lssas)","Processes running from wrong paths","Multiple lsass/csrss instances","Unexpected parent-child (Word→cmd)"],
    src:"Task Manager (spoofable)"},
-  {art:"Hidden processes (psscan)",desc:"Raw pool scan — catches DKOM-unlinked/hidden processes",cat:"Process",quality:"Excellent",
-   cmds:["vol.py -f memory.dmp windows.psscan","# Diff vs pslist: PID in psscan but not pslist = unlinked (rootkit)"],
+  {art:"Hidden processes (psscan)",desc:"Pool scan can find active, exited, stale or unlinked EPROCESS objects",cat:"Process",quality:"Excellent",
+   cmds:["vol.py -f memory.dmp windows.psscan","# Investigate psscan/pslist differences: exited objects and scan artifacts are alternatives to DKOM"],
    iocs:["PID in psscan missing from pslist","Timestomped creation times","No visible parent process"],
    src:"None — memory only"},
   {art:"Multi-method process view (psxview)",desc:"Compares 4+ process enumeration methods to spot hiding",cat:"Process",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.malware.psxview.PsXView","vol.py -f memory.dmp windows.psxview"],
-   iocs:["Enumeration mismatch is an investigative lead, not proof of deliberate hiding","Discrepancy between pslist/psscan/handles/sessions","Classic rootkit signature"],
-   src:"None — memory only (use this for definitive hiding detection)"},
-  {art:"Process command line",desc:"Full CLI args including post-launch cleared args",cat:"Process",quality:"Excellent",
+   iocs:["Enumeration mismatch is an investigative lead, not proof of deliberate hiding","Discrepancy between pslist/psscan/handles/sessions","Possible DKOM tampering only after ruling out exited processes and parsing issues"],
+   src:"Memory enumeration cross-check; investigate mismatches before concluding hiding"},
+  {art:"Process command line",desc:"Command-line parameters recovered from process memory when still available; may be modified or missing",cat:"Process",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.cmdline","vol.py -f memory.dmp windows.cmdline --pid <PID>"],
    iocs:["Encoded PowerShell (-enc, -EncodedCommand)","LOLBin abuse (certutil, mshta, regsvr32, wscript)","Download cradles (IEX, DownloadString)","Double-extension files (invoice.pdf.exe)"],
    src:"Event ID 4688 (partial)"},
@@ -784,7 +784,7 @@ const DATA = [
    src:"None — memory only"},
   {art:"Process token privileges",desc:"Privilege set held by each process token",cat:"Process",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.privileges.Privs","vol.py -f memory.dmp windows.privileges.Privs --pid <PID>"],
-   iocs:["SeDebugPrivilege in non-admin process = credential dumping","SeImpersonatePrivilege abuse (token theft)","SeLoadDriverPrivilege = driver install capability"],
+   iocs:["SeDebugPrivilege in an unexpected process merits review; token privilege alone does not prove credential access","SeImpersonatePrivilege abuse (token theft)","SeLoadDriverPrivilege = driver install capability"],
    src:"None — memory only"},
   {art:"Process handles",desc:"Open handles: files, registry, mutexes, events, pipes",cat:"Process",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.handles","vol.py -f memory.dmp windows.handles --pid <PID>","vol.py -f memory.dmp windows.mutantscan.MutantScan"],
@@ -792,7 +792,7 @@ const DATA = [
    src:"None — memory only"},
   {art:"Thread list",desc:"Active threads per process with start addresses",cat:"Process",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.threads.Threads --pid <PID>","vol.py -f memory.dmp windows.thrdscan.ThrdScan","vol.py -f memory.dmp windows.malware.suspicious_threads.SuspiciousThreads"],
-   iocs:["Thread start address in private/unbacked memory","Remote thread injection (CreateRemoteThread)","Suspicious thread start address outside any module"],
+   iocs:["Thread start address in private/unbacked memory","Suspicious thread start addresses may indicate injection; technique attribution requires corroboration","Suspicious thread start address outside any module"],
    src:"None — memory only"},
   {art:"PEB masquerade detection",desc:"Detects process name spoofing via EPROCESS vs PEB mismatch",cat:"Process",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.malware.pebmasquerade.PebMasquerade"],
@@ -817,19 +817,19 @@ const DATA = [
    src:"None — memory only"},
   {art:"LDR modules (ldrmodules)",desc:"Compares 3 PEB loader lists to find hidden/unlinked DLLs",cat:"Injection",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.malware.ldrmodules.LdrModules","vol.py -f memory.dmp windows.malware.ldrmodules.LdrModules --pid <PID>"],
-   iocs:["DLL present in VAD but FALSE in InLoad/InMem/InInit = reflective injection","All three lists FALSE for a mapped image = fully hidden DLL","Discrepancy between any two loader lists"],
+   iocs:["VAD image with inconsistent PEB loader-list membership warrants inspection; not proof of reflective loading","Mapped image absent from PEB lists may be suspicious, stale or intentionally unlinked","Discrepancy between any two loader lists"],
    src:"None — memory only"},
   {art:"Loaded DLLs (dlllist)",desc:"DLLs from PEB InLoadOrder list per process",cat:"Injection",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.dlllist.DllList","vol.py -f memory.dmp windows.dlllist.DllList --pid <PID>"],
-   iocs:["DLLs loaded from temp/appdata/ProgramData","DLL with no path (reflective load)","Known-bad DLL names","Unsigned DLL in signed process space"],
+   iocs:["DLLs loaded from temp/appdata/ProgramData","Unusual DLL metadata or missing path — verify loading mechanism","Known-bad DLL names","Unsigned DLL in signed process space"],
    src:"Disk (partial) — use ldrmodules for hidden DLL detection"},
   {art:"IAT inspection",desc:"Extract Import Address Table to identify API usage",cat:"Injection",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.iat.IAT --pid <PID>"],
-   iocs:["VirtualAlloc+WriteProcessMemory+CreateRemoteThread combo = injection","APIs inconsistent with stated process purpose","Hooked IAT entries — address outside module range"],
+   iocs:["Import table references to memory/thread APIs are leads; imports do not establish the APIs were invoked","APIs inconsistent with stated process purpose","Hooked IAT entries — address outside module range"],
    src:"None — memory only"},
   {art:"Unhooked syscall detection",desc:"Detects hooked ntdll stubs and direct/indirect syscall abuse",cat:"Injection",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.malware.unhooked_system_calls.UnhookedSystemCalls","vol.py -f memory.dmp windows.malware.direct_system_calls.DirectSystemCalls","vol.py -f memory.dmp windows.malware.indirect_system_calls.IndirectSystemCalls"],
-   iocs:["ntdll stubs patched to bypass EDR hooks","Direct syscall instructions in user-mode code","Indirect syscall trampolines — advanced EDR evasion"],
+   iocs:["Nonstandard syscall stubs or modified code may indicate tampering; compare known-good versions","Direct syscall instructions in user-mode code","Indirect syscall trampolines — advanced EDR evasion"],
    src:"None — memory only"},
   {art:"ETW patch detection",desc:"Detects Event Tracing for Windows patching by malware",cat:"Injection",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.etwpatch.EtwPatch"],
@@ -838,7 +838,7 @@ const DATA = [
   // ── KERNEL ──
   {art:"SSDT hooks",desc:"System Service Descriptor Table — kernel-mode hook detection",cat:"Kernel",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.ssdt.SSDT"],
-   iocs:["SSDT entries outside ntoskrnl.exe or win32k.sys","Hooks on NtOpenProcess, NtReadVirtualMemory, NtQuerySystemInformation","Any modified SSDT entry — classic rootkit technique"],
+   iocs:["SSDT entries outside ntoskrnl.exe or win32k.sys","Hooks on NtOpenProcess, NtReadVirtualMemory, NtQuerySystemInformation","SSDT address anomalies require module and OS-version validation before rootkit conclusions"],
    src:"None — memory only"},
   {art:"Kernel callbacks",desc:"Registered kernel notification routines",cat:"Kernel",quality:"Good",
    cmds:["vol.py -f memory.dmp windows.callbacks.Callbacks"],
@@ -847,7 +847,7 @@ const DATA = [
   // ── NETWORK ──
   {art:"Active TCP connections (netstat)",desc:"Live TCP connections from kernel tracking structures",cat:"Network",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.netstat.NetStat"],
-   iocs:["Established connections from processes with no network role","Non-browser process on 80/443","Internal recon connections (445, 3389, 135)","Beaconing pattern — periodic short-lived connections"],
+   iocs:["Established connections from processes with no network role","Non-browser HTTPS traffic is common; investigate destination, owner and context","Internal recon connections (445, 3389, 135)","A single RAM snapshot cannot establish a beaconing interval; use time-series network logs"],
    src:"Sysmon Event ID 3, firewall logs"},
   {art:"Network pool scan (netscan)",desc:"Pool scan — catches active and recently closed sockets",cat:"Network",quality:"Excellent",
    cmds:["vol.py -f memory.dmp windows.netscan.NetScan"],
