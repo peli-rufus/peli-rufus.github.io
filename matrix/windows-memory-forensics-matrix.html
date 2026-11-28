@@ -91,6 +91,11 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
 .bars { display: flex; gap: 2px; margin-top: 3px; }
 .bar { height: 3px; width: 10px; border-radius: 2px; background: var(--border); }
 .vol-cmd { font-family: var(--mono); font-size: 10.5px; background: var(--bg3); border: 0.5px solid var(--border); border-radius: 4px; padding: 2px 6px; display: block; margin: 2px 0; color: var(--text); white-space: pre; overflow-x: auto; max-width: 340px; }
+/* Make instructional comments distinct from commands in both colour themes. */
+:root { --cmd-comment: #986006; --cmd-comment-bg: rgba(176, 110, 20, 0.09); }
+@media (prefers-color-scheme: dark) { :root { --cmd-comment: #f4c979; --cmd-comment-bg: rgba(244, 201, 121, 0.10); } }
+.vol-cmd.vol-comment { color: var(--cmd-comment); background: var(--cmd-comment-bg); border-left: 3px solid currentColor; padding-left: 8px; font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere; }
+
 .ioc-cell { font-size: 11px; color: var(--text2); line-height: 1.65; }
 .ioc-item { display: flex; align-items: flex-start; gap: 5px; }
 .ioc-dot { margin-top: 5px; width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
@@ -1190,7 +1195,7 @@ function buildTable(){
     const iocHtml = d.iocs.map(i =>
       `<div class="ioc-item"><span class="ioc-dot" style="background:${q.color}"></span><span>${i}</span></div>`
     ).join("");
-    const cmdsHtml = d.cmds.map(c => `<span class="vol-cmd">${c.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`).join("");
+    const cmdsHtml = d.cmds.map(c => `<span class="vol-cmd${c.trimStart().startsWith("#") ? " vol-comment" : ""}">${c.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`).join("");
     const searchText = [d.art, d.desc, d.cat, ...d.cmds, ...d.iocs, d.quality, d.src].join(" ").toLowerCase();
     const cc = catColor(d.cat);
     return `<tr data-cat="${d.cat}" data-text="${searchText}"
