@@ -1435,11 +1435,11 @@ EOF</code>
         <code class="cmd-line">Expand-Archive linux.zip -DestinationPath volatility3\symbols\</code>
       </div>
       <div class="cmd-block">
-        <div class="cmd-block-label">Custom symbol path via environment variable</div>
-        <code class="cmd-comment"># Set a persistent custom symbol path in PowerShell</code>
+        <div class="cmd-block-label">Custom symbol path using the official -s option</div>
+        <code class="cmd-comment"># Supply an additional symbol directory (PowerShell)</code>
         <code class="cmd-line">python vol.py -s C:\symbols -f C:\cases\memory.dmp windows.info</code>
-        <code class="cmd-comment"># Or set it per-session</code>
-        <code class="cmd-line">$env:-s /path/to/symbols = &quot;C:\symbols&quot;</code>
+        <code class="cmd-comment"># For another directory, change the path after -s</code>
+        <code class="cmd-line">python vol.py -s D:\forensics\symbols -f C:\cases\memory.dmp windows.info</code>
       </div>
       <div class="install-note">
         <strong>Where to put symbol files:</strong> Place extracted <code style="font-family:var(--mono);font-size:11px">.json.xz</code> files in <code style="font-family:var(--mono);font-size:11px">volatility3\volatility3\symbols\windows\</code>. Vol3 will scan this directory recursively at runtime. Kernel translation failures can also reflect unsupported/partial capture formats or acquisition issues; inspect the precise automagic error before diagnosing missing symbols.
