@@ -1265,7 +1265,7 @@ function switchOS(os) {
       <div class="install-section-title">3 &mdash; Symbol tables (ISF files)</div>
       <p class="install-p">Volatility 3 requires Intermediate Symbol Files (ISF) to parse kernel structures. Without the correct symbol table for the target OS, most plugins will fail. There are two ways to get them.</p>
       <div class="cmd-block">
-        <div class="cmd-block-label">Option A — Download pre-built symbol packs (recommended)</div>
+        <div class="cmd-block-label">Option A — Download pre-built symbol packs (optional; useful offline)</div>
         <code class="cmd-comment"># Create the symbols directory</code>
         <code class="cmd-line">mkdir -p volatility3/symbols</code>
         <code class="cmd-comment"># Download Windows symbol pack from Volatility Foundation</code>
@@ -1278,14 +1278,14 @@ function switchOS(os) {
         <code class="cmd-line">unzip linux.zip -d volatility3/symbols/</code>
       </div>
       <div class="cmd-block">
-        <div class="cmd-block-label">Option B — Auto-download at runtime</div>
+        <div class="cmd-block-label">Option B — Automatic Windows PDB retrieval (recommended when online)</div>
         <code class="cmd-comment"># Vol3 can attempt to fetch the right symbol table automatically</code>
         <code class="cmd-comment"># when it identifies the image — requires internet access</code>
         <code class="cmd-line">python3 vol.py -f memory.dmp windows.info</code>
         <code class="cmd-comment"># If auto-download fails, Vol3 will print the exact ISF URL to fetch manually</code>
       </div>
       <div class="install-note">
-        <strong>Symbol table location:</strong> Vol3 searches <code style="font-family:var(--mono);font-size:11px">volatility3/symbols/</code> by default. You can also set the environment variable <code style="font-family:var(--mono);font-size:11px">VOLATILITY_SYMBOL_PATH</code> to point to a custom directory, useful when maintaining a central symbol store across multiple installations.
+        <strong>Symbol table location:</strong> Windows symbols can commonly be resolved automatically from Microsoft PDBs when network access is available; prebuilt packs are optional. Vol3 searches <code style="font-family:var(--mono);font-size:11px">volatility3/symbols/</code> by default. You can also set the environment variable <code style="font-family:var(--mono);font-size:11px">-s /path/to/symbols</code> to point to a custom directory, useful when maintaining a central symbol store across multiple installations.
       </div>
     </div>
 
@@ -1409,11 +1409,9 @@ EOF</code>
         <code class="cmd-line">cd volatility3</code>
         <code class="cmd-comment"># Create and activate a virtual environment</code>
         <code class="cmd-line">python -m venv venv</code>
-        <code class="cmd-line">venv\Scripts\activate          # cmd / PowerShell</code>
-        <code class="cmd-line">source venv/Scripts/activate   # Git Bash</code>
-        <code class="cmd-comment"># Fix ownership if cloned to /opt as root (common on Kali)</code>
-        <code class="cmd-line">sudo chown -R $USER:$USER /opt/volatility3</code>
-        <code class="cmd-comment"># Install Volatility 3 and all dependencies (no sudo needed after chown)</code>
+        <code class="cmd-line">&#46;\venv\Scripts\Activate.ps1  # PowerShell</code>
+        <code class="cmd-line">source venv/Scripts/activate   # Git Bash (or venv\Scripts\activate.bat in cmd.exe)</code>
+        <code class="cmd-comment"># Install Volatility 3 and optional analysis dependencies in the active venv</code>
         <code class="cmd-line">pip install -e &quot;.[full]&quot;</code>
         <code class="cmd-comment"># Verify installation</code>
         <code class="cmd-line">python vol.py --version</code>
@@ -1439,9 +1437,9 @@ EOF</code>
       <div class="cmd-block">
         <div class="cmd-block-label">Custom symbol path via environment variable</div>
         <code class="cmd-comment"># Set a persistent custom symbol path in PowerShell</code>
-        <code class="cmd-line">[Environment]::SetEnvironmentVariable(&quot;VOLATILITY_SYMBOL_PATH&quot;, &quot;C:\symbols&quot;, &quot;User&quot;)</code>
+        <code class="cmd-line">python vol.py -s C:\symbols -f C:\cases\memory.dmp windows.info</code>
         <code class="cmd-comment"># Or set it per-session</code>
-        <code class="cmd-line">$env:VOLATILITY_SYMBOL_PATH = &quot;C:\symbols&quot;</code>
+        <code class="cmd-line">$env:-s /path/to/symbols = &quot;C:\symbols&quot;</code>
       </div>
       <div class="install-note">
         <strong>Where to put symbol files:</strong> Place extracted <code style="font-family:var(--mono);font-size:11px">.json.xz</code> files in <code style="font-family:var(--mono);font-size:11px">volatility3\volatility3\symbols\windows\</code>. Vol3 will scan this directory recursively at runtime. Kernel translation failures can also reflect unsupported/partial capture formats or acquisition issues; inspect the precise automagic error before diagnosing missing symbols.
@@ -1506,7 +1504,7 @@ EOF</code>
       <div class="cmd-block">
         <div class="cmd-block-label">Smoke test in PowerShell or Git Bash</div>
         <code class="cmd-comment"># Activate venv first</code>
-        <code class="cmd-line">venv\Scripts\activate</code>
+        <code class="cmd-line">&#46;\venv\Scripts\Activate.ps1</code>
         <code class="cmd-comment"># Run against a test image — should print OS info</code>
         <code class="cmd-line">python vol.py -f C:\cases\memory.dmp windows.info</code>
         <code class="cmd-comment"># List available windows plugins</code>
