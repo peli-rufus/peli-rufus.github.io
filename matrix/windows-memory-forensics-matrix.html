@@ -247,6 +247,7 @@ td { padding: 8px 12px; vertical-align: top; line-height: 1.5; }
     <button class="tab-btn active" onclick="showTab('matrix',this)">Artifact Matrix</button>
     <button class="tab-btn" onclick="showTab('methodology',this)">Analysis Methodology</button>
     <button class="tab-btn" onclick="showTab('mentalmodel',this)">Mental Model</button>
+    <button class="tab-btn" onclick="showTab('collection',this)">Memory Collection</button>
     <button class="tab-btn" onclick="showTab('install',this)">Installation Guide</button>
   </div>
 </div>
@@ -1253,7 +1254,54 @@ function switchOS(os) {
 
 </script>
 
-<!-- ═══ TAB 4: INSTALLATION GUIDE ═══ -->
+<!-- ═══ TAB 4: MEMORY COLLECTION GUIDE ═══ -->
+<div id="tab-collection" class="tab-panel">
+<div class="content-page">
+  <h2>Memory Collection Guide</h2>
+  <p class="page-sub">Capture memory from a target system before analysing it with Volatility 3. Acquisition tools run on the target; Volatility runs against the collected memory image.</p>
+  <div class="why-box"><strong>Collection versus analysis:</strong> Choose the acquisition method appropriate for the operating system, permissions and incident context. Document collection details and preserve the original capture. For Volatility setup, use the separate <strong>Installation Guide</strong> tab.</div>
+  <div class="install-section">
+    <div class="install-section-title">Windows memory acquisition</div>
+    <p class="install-p">These tools create Windows memory images for subsequent analysis. They generally require administrator privileges. Confirm the current tool's syntax and supported Windows versions before use.</p>
+      <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">winpmem</div>
+          <div class="tool-desc">Open-source Windows memory acquirer — part of the original Rekall project, still maintained independently</div>
+          <code class="tool-cmd">winpmem_mini_x64.exe memory.dmp</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">DumpIt</div>
+          <div class="tool-desc">Single-executable memory acquirer by Comae — simple, reliable, widely used in IR engagements</div>
+          <code class="tool-cmd">DumpIt.exe /O memory.dmp</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">FTK Imager</div>
+          <div class="tool-desc">GUI tool from Exterro — acquire memory and disk images; also supports parsing live systems</div>
+          <code class="tool-cmd"># File → Capture Memory → select output path</code>
+        </div>
+        <div class="tool-card">
+          <div class="tool-name">Magnet RAM Capture</div>
+          <div class="tool-desc">Free, lightweight GUI acquirer from Magnet Forensics — good for quick triage</div>
+          <code class="tool-cmd"># Run as Admin, select output path, click Capture</code>
+        </div>
+      </div>
+  </div>
+  <div class="install-section">
+    <div class="install-section-title">Linux memory acquisition</div>
+    <p class="install-p">LiME is a Linux memory acquisition option implemented as a loadable kernel module. Compatibility and module-loading requirements depend on the target kernel; collecting memory can affect the live system.</p>
+    <div class="tool-grid">
+        <div class="tool-card">
+          <div class="tool-name">LiME</div>
+          <div class="tool-desc">Linux Memory Extractor — loadable kernel module for live Linux memory acquisition</div>
+          <code class="tool-cmd">git clone https://github.com/504ensicsLabs/LiME</code>
+        </div>
+    </div>
+  </div>
+  <div class="install-note"><strong>After collection:</strong> Record the source host, collection date/time, tool/version, acquisition method, output filename, integrity hash and any errors. Work from a verified copy of the acquired image. Collection quality and dump-format support can affect Volatility results.</div>
+</div>
+</div><!-- end tab-collection -->
+
+<!-- ═══ TAB 5: INSTALLATION GUIDE ═══ -->
 <div id="tab-install" class="tab-panel">
 <div class="content-page">
   <h2>Installation Guide</h2>
@@ -1335,13 +1383,8 @@ function switchOS(os) {
 
     <div class="install-section">
       <div class="install-section-title">4 &mdash; Recommended supporting tools</div>
-      <p class="install-p">Volatility alone covers the analysis side. These tools handle acquisition, post-extraction analysis, and IOC enrichment.</p>
+      <p class="install-p">Volatility alone covers the analysis side. These tools support post-extraction analysis and IOC enrichment. For memory acquisition, see the Memory Collection tab.</p>
       <div class="tool-grid">
-        <div class="tool-card">
-          <div class="tool-name">LiME</div>
-          <div class="tool-desc">Linux Memory Extractor — loadable kernel module for live Linux memory acquisition</div>
-          <code class="tool-cmd">git clone https://github.com/504ensicsLabs/LiME</code>
-        </div>
         <div class="tool-card">
           <div class="tool-name">strings / binutils</div>
           <div class="tool-desc">Raw string extraction from memory dumps and dumped process images</div>
@@ -1491,34 +1534,7 @@ EOF</code>
     </div>
 
     <div class="install-section">
-      <div class="install-section-title">4 &mdash; Memory acquisition tools for Windows</div>
-      <p class="install-p">For live acquisition from a Windows target, these tools create the memory dump that Volatility then analyses. Run acquisition tools as Administrator.</p>
-      <div class="tool-grid">
-        <div class="tool-card">
-          <div class="tool-name">winpmem</div>
-          <div class="tool-desc">Open-source Windows memory acquirer — part of the original Rekall project, still maintained independently</div>
-          <code class="tool-cmd">winpmem_mini_x64.exe memory.dmp</code>
-        </div>
-        <div class="tool-card">
-          <div class="tool-name">DumpIt</div>
-          <div class="tool-desc">Single-executable memory acquirer by Comae — simple, reliable, widely used in IR engagements</div>
-          <code class="tool-cmd">DumpIt.exe /O memory.dmp</code>
-        </div>
-        <div class="tool-card">
-          <div class="tool-name">FTK Imager</div>
-          <div class="tool-desc">GUI tool from Exterro — acquire memory and disk images; also supports parsing live systems</div>
-          <code class="tool-cmd"># File → Capture Memory → select output path</code>
-        </div>
-        <div class="tool-card">
-          <div class="tool-name">Magnet RAM Capture</div>
-          <div class="tool-desc">Free, lightweight GUI acquirer from Magnet Forensics — good for quick triage</div>
-          <code class="tool-cmd"># Run as Admin, select output path, click Capture</code>
-        </div>
-      </div>
-    </div>
-
-    <div class="install-section">
-      <div class="install-section-title">5 &mdash; Recommended supporting tools</div>
+      <div class="install-section-title">4 &mdash; Recommended supporting tools</div>
       <div class="tool-grid">
         <div class="tool-card">
           <div class="tool-name">YARA for Windows</div>
@@ -1544,7 +1560,7 @@ EOF</code>
     </div>
 
     <div class="install-section">
-      <div class="install-section-title">6 &mdash; Verify everything works</div>
+      <div class="install-section-title">5 &mdash; Verify everything works</div>
       <div class="cmd-block">
         <div class="cmd-block-label">Smoke test in PowerShell or Git Bash</div>
         <code class="cmd-comment"># Activate venv first</code>
@@ -1559,7 +1575,7 @@ EOF</code>
     </div>
 
     <div class="install-section">
-      <div class="install-section-title">7 &mdash; Set up the <code style="font-size:13px;font-family:var(--mono)">vol</code> command on Windows</div>
+      <div class="install-section-title">6 &mdash; Set up the <code style="font-size:13px;font-family:var(--mono)">vol</code> command on Windows</div>
       <p class="install-p">On Windows you can create a batch file wrapper so you can type <code style="font-family:var(--mono);font-size:12px">vol</code> from any directory instead of specifying the full python path each time.</p>
       <div class="cmd-block">
         <div class="cmd-block-label">Option A — Batch file wrapper (PowerShell / cmd)</div>
